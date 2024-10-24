@@ -1,0 +1,11 @@
+<chainlit.message.Message object at 0x0000023983990B50>,2,Hello! How can I assist you today? Would you like to know more about insurance? Or do you have any questions regarding your existing policy?,30
+<chainlit.message.Message object at 0x000002398399C2B0>,12,"Yes, I can help you with that! Insurance is a contract whereby one party (the insurer or underwriter) agrees to indemnify another party (the policyholder or insured) against financial loss due to specified risks or perils. The policyholder pays a premium to the insurer in exchange for coverage, and if an unexpected event occurs, the insurer provides financial compensation to the policyholder.
+
+Please let me know if you have any other questions related to insurance.",108
+can you tell me about law of numbers,8,"The Law of Large Numbers is a fundamental principle in insurance that states that as the number of observations or events increases, the observed frequency of certain outcomes will get closer to their expected probability. In simpler terms, the more data you have, the more likely your observations will be close to the actual probabilities.
+
+",67
+hello hi,2,"I'm happy to help you with any questions you have about insurance! Can you tell me a bit more about what you're looking for? Do you need help finding the right policy, or understanding how it works?",46
+can you tell me about various types of insurances,11,"Of course! There are several types of insurance available, including life insurance, general/non-life insurance (which covers things like motor vehicles, householders insurance, etc.), health insurance, and long-term care insurance. Each type of insurance provides protection against different types of risks.
+Please let me know if you have any other questions!",77
+i am interested in buying life insurance,9,"That's great! Life insurance can provide financial security for you and your loved ones in the event of an unexpected death or disability. As an insurance agent, I would need to know more about your situation to determine the best life insurance policy for you. Can you tell me a bit more about yourself and why you're interested in buying life insurance?",77

@@ -1,0 +1,32 @@
+{
+  "kind": "collectionType",
+  "collectionName": "insurance_quotes",
+  "info": {
+    "singularName": "insurance-quote",
+    "pluralName": "insurance-quotes",
+    "displayName": "Insurance Quote"
+  },
+  "options": {
+    "draftAndPublish": true
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "name": {
+      "type": "string"
+    },
+    "contact_number": {
+      "type": "string"
+    },
+    "email": {
+      "type": "email"
+    },
+    "appointmentDate": {
+      "type": "date"
+    },
+    "insurance": {
+      "type": "relation",
+      "relation": "oneToOne",
+      "target": "api::insurance.insurance"
+    }
+  }
+}
