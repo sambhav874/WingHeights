@@ -1,1 +1,42 @@
-module.exports = { apps: [ { name: 'strapi-wingheights', script: 'npm', args: 'start', env_production: { NODE_ENV: 'production' } } ] };
+module.exports = {
+  apps: [
+    {
+      name: 'frontend-dev',
+      cwd: './frontend',
+      script: 'npm',
+      args: 'start',
+      env: {
+	PORT: 3001,
+        NODE_ENV: 'development',
+      },
+    },
+    {
+      name: 'frontend-prod',
+      cwd: './frontend',
+      script: 'npm',
+      args: 'start',
+      env: {
+        NODE_ENV: 'production',
+      },
+    },
+    {
+      name: 'backend-dev',
+      cwd: './backend',
+      script: 'npm',
+      args: 'start',
+      env: {
+	PORT: 1339,
+        NODE_ENV: 'development',
+      },
+    },
+    {
+      name: 'backend-prod',
+      cwd: './backend',
+      script: 'npm',
+      args: 'start',
+      env: {
+        NODE_ENV: 'production',
+      },
+    },
+  ],
+};
