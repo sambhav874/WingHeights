@@ -1,0 +1,5 @@
+rag_env
+.env.production
+.env.development
+venv
+.DS_Store
