@@ -1,155 +1,179 @@
 from flask import Flask, request, jsonify
+from flask_cors import CORS
+import os
 import csv
-import requests
-import sentencepiece as spm
-from langchain.prompts import PromptTemplate
-from langchain.embeddings import HuggingFaceEmbeddings
-from langchain.vectorstores import FAISS
-from langchain.chains import RetrievalQA
-from langchain.llms.base import LLM
-import json
-from flask_cors import CORS 
+import ollama
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain_community.embeddings import HuggingFaceEmbeddings
+from langchain_community.vectorstores import FAISS
+from langchain.document_loaders import PyPDFLoader, DirectoryLoader
+from langchain.schema import Document
 
 app = Flask(__name__)
 CORS(app)
 
-# Define paths
+# Constants
+DATA_PATH = "data/"
 DB_FAISS_PATH = "vectorstores/db_faiss"
-
-def count_tokens(text):
-    return len(text.split())
+EMBEDDINGS_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
+LLAMA_MODEL = "llama3.1:8b"
 
 custom_prompt_template = """
-You are ADA, who is helping people in the insurance sector, so perform conversation and ask questions accordingly.
+You are an insurance agent of Wing Heights Ghana - An insurance provider.
 Use the following pieces of information to answer the user's question.
 Answer the question only if it is present in the given piece of information.
-If you don't know the answer, please just say that you don't know the answer.
-But do answer basic greeting messages with a short statement.
-Converse as if you are an insurance agent and ask questions accordingly.
+If you don't know the answer or the question is not related to the provided information, say: "I am an insurance agent and I can only provide insurance solutions offered by our company. Would you like to book an appointment to discuss your insurance needs?"
+
+If the user wants to book an appointment, ask for the following details one by one:
+1. Name
+2. Contact Number
+3. Email
+4. Appointment Date
+5. Insurance Type
+
+After collecting all details, provide a summary of the appointment details.
+
+If the user doesn't want to book an appointment, end the conversation politely.
+
+For basic greetings, respond with short, friendly statements.
 
 Context: {context}
 Question: {question}
+
 Helpful answer:
 """
 
-# Function to set the custom prompt
-def set_custom_prompt():
-    prompt = PromptTemplate(template=custom_prompt_template, input_variables=['context', 'question'])
-    return prompt
+def create_vector_db():
+    if not os.path.exists(DATA_PATH) or not os.listdir(DATA_PATH):
+        print(f"No PDF files found in {DATA_PATH}. Please add your PDF files and restart the application.")
+        return None
 
-# Custom LLM wrapper for query_ollama_v2
-class OllamaLLM(LLM):
-    def _call(self, prompt: str, stop=None):
-        return query_ollama_v2(prompt)
+    loader = DirectoryLoader(DATA_PATH, glob="*.pdf", loader_cls=PyPDFLoader)
+    documents = loader.load()
 
-    @property
-    def _llm_type(self):
-        return "custom_ollama_llm"
+    text_splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
+    texts = text_splitter.split_documents(documents)
 
-def query_ollama_v2(prompt):
-    url = "http://localhost:11434/api/generate"
-    headers = {
-        "Content-Type": "application/json"
-    }
-    data = {
-        "model": "llama3.1:8b",  # Use the appropriate model identifier
-        "prompt": prompt
-    }
+    embeddings = HuggingFaceEmbeddings(model_name=EMBEDDINGS_MODEL, model_kwargs={"device": "cpu"})
+    
+    db = FAISS.from_documents(texts, embeddings)
+    os.makedirs(os.path.dirname(DB_FAISS_PATH), exist_ok=True)
+    db.save_local(DB_FAISS_PATH)
+    print(f"Vector store created and saved to {DB_FAISS_PATH}")
+    return db
 
-    response = requests.post(url, headers=headers, json=data)
+def load_vector_db():
+    if not os.path.exists(DB_FAISS_PATH):
+        print("Vector store not found. Creating new vector store...")
+        return create_vector_db()
+    embeddings = HuggingFaceEmbeddings(model_name=EMBEDDINGS_MODEL, model_kwargs={"device": "cpu"})
+    return FAISS.load_local(DB_FAISS_PATH, embeddings, allow_dangerous_deserialization=True)
 
-    try:
-        responses = response.text.strip().split('\n')
-        collected_responses = []
-
-        for response_str in responses:
-            try:
-                parsed_response = json.loads(response_str)
-                if parsed_response.get("response"):
-                    collected_responses.append(parsed_response["response"])
-            except json.JSONDecodeError as e:
-                print(f"Error decoding JSON: {e}")
-
-        final_output = ''.join(collected_responses)
-
-        if final_output:
-            return final_output.strip()
+def load_llm():
+    def ollama_chat(query, context=""):
+        response = ollama.chat(
+            model=LLAMA_MODEL, 
+            messages=[
+                {"role": "system", "content": custom_prompt_template.format(context=context, question=query)},
+                {"role": "user", "content": query}
+            ]
+        )
+        if response and 'message' in response and 'content' in response['message']:
+            return response['message']['content']
         else:
-            return "I'm sorry, I don't know the answer."
+            return "I apologize, but I couldn't process your request. How else can I assist you with our insurance services?"
 
-    except ValueError as ve:
-        print(f"JSON decoding error: {ve}")
-        raise Exception(f"Ollama API call failed with invalid JSON. Response: {response.text}")
+    return ollama_chat
 
-def retrieval_qa_chain(llm, prompt, db):
-    qa_chain = RetrievalQA.from_chain_type(
-        llm=llm,
-        chain_type="stuff",
-        retriever=db.as_retriever(search_kwargs={'k': 2}),
-        return_source_documents=True,
-        chain_type_kwargs={'prompt': prompt}
-    )
+def retrieval_qa_chain(llm, db):
+    retriever = db.as_retriever(search_kwargs={'k': 2})
+
+    def qa_chain(query):
+        docs = retriever.get_relevant_documents(query)
+        context = "\n".join([doc.page_content for doc in docs])
+        response = llm(query, context)
+        return response
+
     return qa_chain
 
-def qa_bot():
-    embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
-    db = FAISS.load_local(DB_FAISS_PATH, embeddings, allow_dangerous_deserialization=True)
+db = load_vector_db()
+llm = load_llm()
+qa_chain = retrieval_qa_chain(llm, db)
+
+appointment_details = {}
+booking_confirmed = False
+awaiting_confirmation = False
+
+@app.route('/ask', methods=['POST'])
+def ask():
+    global appointment_details, booking_confirmed, awaiting_confirmation
     
-    # Use custom OllamaLLM wrapper for query_ollama_v2
-    llm = OllamaLLM()
-
-    qa_prompt = set_custom_prompt()
-    qa = retrieval_qa_chain(llm, qa_prompt, db)
-    
-    return qa
-
-def final_result(query):
-    qa_result = qa_bot()
-    prompt = f"Question: {query}"
-    answer = query_ollama_v2(prompt)
-    return answer
-
-# Initialize token count
-tokens_count = 0
-
-@app.route('/chat', methods=['POST'])
-def chat():
-    global tokens_count
-    
-    if tokens_count > 2000:
-        return jsonify({"error": "You have expired your tokens! Please speak to the customer care!"}), 403
-
     data = request.json
-    query = data.get('query')
+    user_input = data.get('message')
     
-    if not query:
-        return jsonify({"error": "No query provided"}), 400
-
-    ques_tok = count_tokens(query)
-    tokens_count += ques_tok
+    if not user_input:
+        return jsonify({"error": "No message provided"}), 400
 
     try:
-        answer = final_result(query)
-        ans_tok = count_tokens(answer)
-        tokens_count += ans_tok
+        if appointment_details and booking_confirmed:
+            appointment_fields = ["Name", "Contact Number", "Email", "Appointment Date", "Insurance Type"]
+            current_field = appointment_fields[appointment_details["step"]]
+            
+            appointment_details[current_field] = user_input
+            appointment_details["step"] += 1
 
-        # Log the conversation
-        with open('chatbot_data.csv', mode='a', newline='', encoding='utf-8') as file:
-            writer = csv.writer(file)
-            writer.writerow([query, ques_tok, answer, ans_tok])
+            if appointment_details["step"] < len(appointment_fields):
+                next_field = appointment_fields[appointment_details["step"]]
+                response = f"Thank you. Now, please provide your {next_field}:"
+            else:
+                summary = "Appointment Details:\n"
+                for field in appointment_fields:
+                    summary += f"{field}: {appointment_details.get(field, 'Not provided')}\n"
+                response = f"Thank you for providing all the details. Here's a summary of your appointment:\n\n{summary}\nWe look forward to assisting you!"
+                
+                with open('appointment_details.csv', mode='a', newline='', encoding='utf-8') as file:
+                    writer = csv.writer(file)
+                    writer.writerow([appointment_details.get(field, 'Not provided') for field in appointment_fields])
+                
+                appointment_details = {}
+                booking_confirmed = False
+        elif awaiting_confirmation:
+            if user_input.lower() == 'yes':
+                booking_confirmed = True
+                appointment_details = {"step": 0}
+                response = "Great! Let's book an appointment. Please provide your Name:"
+            elif user_input.lower() == 'no':
+                response = "No problem. How else can I assist you with our insurance services?"
+                appointment_details = {}
+                booking_confirmed = False
+            else:
+                response = "I'm sorry, I didn't understand your response. Please answer with 'Yes' or 'No'. Would you like to book an appointment?"
+            awaiting_confirmation = user_input.lower() not in ['yes', 'no']
+        else:
+            response = qa_chain(user_input)
+            
+            if "book an appointment" in response.lower():
+                response += "\n\nWould you like to book an appointment? Please respond with 'Yes' or 'No'."
+                awaiting_confirmation = True
+
+        requires_input = awaiting_confirmation or (appointment_details and booking_confirmed)
+        token_count = len(response.split())
+        max_tokens = 2000
 
         return jsonify({
-            "answer": answer,
-            "tokens_used": {
-                "question": ques_tok,
-                "answer": ans_tok,
-                "total": tokens_count
-            }
+            "response": response,
+            "requires_input": requires_input,
+            "token_count": token_count,
+            "max_tokens": max_tokens
         })
-
     except Exception as e:
-        print(e)
         return jsonify({"error": str(e)}), 500
 
-if __name__ == '__main__':
-    app.run(debug=True)
+if __name__ == "__main__":
+    if not os.path.exists(DB_FAISS_PATH):
+        print("Vector store not found. Creating new vector store...")
+        db = create_vector_db()
+        if db is None:
+            print("Failed to create vector store. Exiting.")
+            exit(1)
+    app.run(debug=True, port=5001)
