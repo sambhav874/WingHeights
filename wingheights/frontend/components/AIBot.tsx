@@ -31,7 +31,7 @@ const INITIAL_MESSAGE: Message = {
   timestamp: new Date()
 }
 
-const API_ENDPOINT = 'http://127.0.0.1:5001/ask'
+const API_ENDPOINT = 'https://dev.srv618269.hstgr.cloud/chat/ask'
 
 export default function BotWidget() {
   const [isOpen, setIsOpen] = useState(false)

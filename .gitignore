@@ -6,3 +6,4 @@ venv
 ecosystem.config.dev.js
 ecosystem.config.prod.js
 ecosystem.config.js
+appointment_details.csv

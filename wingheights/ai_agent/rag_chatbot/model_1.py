@@ -104,7 +104,7 @@ appointment_details = {}
 booking_confirmed = False
 awaiting_confirmation = False
 
-@app.route('/ask', methods=['POST'])
+@app.route('/chat/ask', methods=['POST'])
 def ask():
     global appointment_details, booking_confirmed, awaiting_confirmation
     
