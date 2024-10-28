@@ -8,15 +8,22 @@ from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_community.vectorstores import FAISS
 from langchain.document_loaders import PyPDFLoader, DirectoryLoader
 from langchain.schema import Document
-
+from dotenv import load_dotenv
+load_dotenv()
 app = Flask(__name__)
 CORS(app)
 
 # Constants
-DATA_PATH = "data/"
-DB_FAISS_PATH = "vectorstores/db_faiss"
-EMBEDDINGS_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
-LLAMA_MODEL = "llama3.1:8b"
+DATA_PATH = os.getenv('DATA_PATH', 'data/')
+DB_FAISS_PATH = os.getenv('DB_FAISS_PATH', 'vectorstores/db_faiss')
+EMBEDDINGS_MODEL = os.getenv('EMBEDDINGS_MODEL', 'sentence-transformers/all-MiniLM-L6-v2')
+LLAMA_MODEL = os.getenv('LLAMA_MODEL', 'llama3.1:8b')
+
+required_env_vars = ['FLASK_ENV', 'FLASK_APP', 'PORT', 'DATA_PATH', 'DB_FAISS_PATH', 'EMBEDDINGS_MODEL', 'LLAMA_MODEL']
+for var in required_env_vars:
+    if os.getenv(var) is None:
+        raise EnvironmentError(f"Required environment variable {var} is not set")
+
 
 custom_prompt_template = """
 You are an insurance agent of Wing Heights Ghana - An insurance provider.
@@ -176,4 +183,5 @@ if __name__ == "__main__":
         if db is None:
             print("Failed to create vector store. Exiting.")
             exit(1)
-    app.run(debug=True, port=5001)
+    port = int(os.getenv('PORT', 5001))
+    app.run(debug=os.getenv('FLASK_ENV') == 'development', port=port)
