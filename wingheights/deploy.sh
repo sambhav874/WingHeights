@@ -30,6 +30,7 @@ deploy_development() {
     cd ai_agent/rag_chatbot
     source venv/bin/activate
     pip install -r requirements.txt
+    deactivate
     cd $PROJECT_ROOT
 
     # Restart PM2 processes for the development environment
@@ -39,10 +40,48 @@ deploy_development() {
     echo "Deployment for development environment completed!"
 }
 
+# Function to deploy for the production environment
+deploy_production() {
+    echo "Deploying for production environment..."
+
+    # Navigate to the project root
+    cd $PROJECT_ROOT
+
+    # Rebuild and restart frontend
+    echo "Rebuilding frontend..."
+    cd frontend
+    npm ci
+    npm run build
+    cd $PROJECT_ROOT
+
+    # Rebuild and restart backend
+    echo "Rebuilding backend..."
+    cd backend
+    npm ci
+    npm run build
+    cd $PROJECT_ROOT
+
+    # Rebuild and restart AI agent
+    echo "Rebuilding AI agent..."
+    cd ai_agent/rag_chatbot
+    source venv/bin/activate
+    pip install -r requirements.txt
+    deactivate
+    cd $PROJECT_ROOT
+
+    # Restart PM2 processes for the production environment
+    echo "Restarting PM2 processes..."
+    pm2 start ecosystem.config.js --only frontend-prod,backend-prod,ai-agent-prod --update-env
+
+    echo "Deployment for production environment completed!"
+}
+
 # Check the argument passed to the script
 if [ "$1" = "development" ]; then
     deploy_development
+elif [ "$1" = "production" ]; then
+    deploy_production
 else
-    echo "Usage: ./deploy.sh development"
+    echo "Usage: ./deploy.sh [development|production]"
     exit 1
 fi
