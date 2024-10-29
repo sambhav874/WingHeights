@@ -34,7 +34,7 @@ deploy_development() {
 
     # Restart PM2 processes for the development environment
     echo "Restarting PM2 processes..."
-    pm2 restart frontend-deve backend-deve ai-agent-deve --update-env
+    pm2 start ecosystem.config.js --only frontend-deve,backend-deve,ai-agent-deve --update-env
 
     echo "Deployment for development environment completed!"
 }
