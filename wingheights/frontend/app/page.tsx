@@ -37,7 +37,6 @@ export default function Component() {
         <section className="bg-purple-900 text-white py-20 relative overflow-hidden">
           <div className="container mx-auto px-4 flex flex-col md:flex-row items-center">
             <div className="md:w-1/2">
-		<h1 className="text-4xl text-black">Production</h1>
               <h1 className="text-5xl font-bold mb-4">Wing Heights Ghana</h1>
               <p className="text-xl mb-8">Enabling #BetterFutures</p>
             </div>
