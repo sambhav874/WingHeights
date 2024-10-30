@@ -1,4 +1,5 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request
+from flask_socketio import SocketIO, emit, join_room, leave_room
 from flask_cors import CORS
 import os
 import csv
@@ -7,23 +8,23 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_community.vectorstores import FAISS
 from langchain.document_loaders import PyPDFLoader, DirectoryLoader
-from langchain.schema import Document
 from dotenv import load_dotenv
+
 load_dotenv()
 app = Flask(__name__)
 CORS(app)
+socketio = SocketIO(app, cors_allowed_origins="*")
 
 # Constants
 DATA_PATH = os.getenv('DATA_PATH', 'data/')
 DB_FAISS_PATH = os.getenv('DB_FAISS_PATH', 'vectorstores/db_faiss')
 EMBEDDINGS_MODEL = os.getenv('EMBEDDINGS_MODEL', 'sentence-transformers/all-MiniLM-L6-v2')
-LLAMA_MODEL = os.getenv('LLAMA_MODEL', 'llama3.1:8b')
+LLAMA_MODEL = os.getenv('LLAMA_MODEL', 'llama3.2:1b')
 
 required_env_vars = ['FLASK_ENV', 'FLASK_APP', 'PORT', 'DATA_PATH', 'DB_FAISS_PATH', 'EMBEDDINGS_MODEL', 'LLAMA_MODEL']
 for var in required_env_vars:
     if os.getenv(var) is None:
         raise EnvironmentError(f"Required environment variable {var} is not set")
-
 
 custom_prompt_template = """
 You are an insurance agent of Wing Heights Ghana - An insurance provider.
@@ -107,74 +108,90 @@ db = load_vector_db()
 llm = load_llm()
 qa_chain = retrieval_qa_chain(llm, db)
 
-appointment_details = {}
-booking_confirmed = False
-awaiting_confirmation = False
+chat_sessions = {}
 
-@app.route('/chat/ask', methods=['POST'])
-def ask():
-    global appointment_details, booking_confirmed, awaiting_confirmation
-    
-    data = request.json
+@socketio.on('connect')
+def handle_connect():
+    session_id = request.sid
+    chat_sessions[session_id] = {
+        'appointment_details': {},
+        'booking_confirmed': False,
+        'awaiting_confirmation': False
+    }
+    join_room(session_id)
+    emit('message', {'response': "Hello! I'm an AI assistant for Wing Heights Ghana Insurance. How can I help you today?"})
+
+@socketio.on('disconnect')
+def handle_disconnect():
+    session_id = request.sid
+    if session_id in chat_sessions:
+        del chat_sessions[session_id]
+    leave_room(session_id)
+
+@socketio.on('message')
+def handle_message(data):
+    session_id = request.sid
     user_input = data.get('message')
     
     if not user_input:
-        return jsonify({"error": "No message provided"}), 400
+        emit('message', {'error': "No message provided"})
+        return
+
+    session = chat_sessions[session_id]
 
     try:
-        if appointment_details and booking_confirmed:
+        if session['appointment_details'] and session['booking_confirmed']:
             appointment_fields = ["Name", "Contact Number", "Email", "Appointment Date", "Insurance Type"]
-            current_field = appointment_fields[appointment_details["step"]]
+            current_field = appointment_fields[len(session['appointment_details'])]
             
-            appointment_details[current_field] = user_input
-            appointment_details["step"] += 1
+            session['appointment_details'][current_field] = user_input
 
-            if appointment_details["step"] < len(appointment_fields):
-                next_field = appointment_fields[appointment_details["step"]]
+            if len(session['appointment_details']) < len(appointment_fields):
+                next_field = appointment_fields[len(session['appointment_details'])]
                 response = f"Thank you. Now, please provide your {next_field}:"
             else:
                 summary = "Appointment Details:\n"
                 for field in appointment_fields:
-                    summary += f"{field}: {appointment_details.get(field, 'Not provided')}\n"
+                    summary += f"{field}: {session['appointment_details'].get(field, 'Not provided')}\n"
                 response = f"Thank you for providing all the details. Here's a summary of your appointment:\n\n{summary}\nWe look forward to assisting you!"
                 
                 with open('appointment_details.csv', mode='a', newline='', encoding='utf-8') as file:
                     writer = csv.writer(file)
-                    writer.writerow([appointment_details.get(field, 'Not provided') for field in appointment_fields])
+                    writer.writerow([session['appointment_details'].get(field, 'Not provided') for field in appointment_fields])
                 
-                appointment_details = {}
-                booking_confirmed = False
-        elif awaiting_confirmation:
+                session['appointment_details'] = {}
+                session['booking_confirmed'] = False
+        elif session['awaiting_confirmation']:
             if user_input.lower() == 'yes':
-                booking_confirmed = True
-                appointment_details = {"step": 0}
+                session['booking_confirmed'] = True
+                session['appointment_details'] = {}
                 response = "Great! Let's book an appointment. Please provide your Name:"
             elif user_input.lower() == 'no':
                 response = "No problem. How else can I assist you with our insurance services?"
-                appointment_details = {}
-                booking_confirmed = False
+                session['appointment_details'] = {}
+                session['booking_confirmed'] = False
             else:
                 response = "I'm sorry, I didn't understand your response. Please answer with 'Yes' or 'No'. Would you like to book an appointment?"
-            awaiting_confirmation = user_input.lower() not in ['yes', 'no']
+            session['awaiting_confirmation'] = user_input.lower() not in ['yes', 'no']
         else:
             response = qa_chain(user_input)
             
             if "book an appointment" in response.lower():
                 response += "\n\nWould you like to book an appointment? Please respond with 'Yes' or 'No'."
-                awaiting_confirmation = True
+                session['awaiting_confirmation'] = True
 
-        requires_input = awaiting_confirmation or (appointment_details and booking_confirmed)
+        requires_input = session['awaiting_confirmation'] or (session['appointment_details'] and session['booking_confirmed'])
         token_count = len(response.split())
         max_tokens = 2000
 
-        return jsonify({
+        emit('message', {
             "response": response,
             "requires_input": requires_input,
             "token_count": token_count,
             "max_tokens": max_tokens
         })
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        emit('message', {"error": str(e)})
 
 if __name__ == "__main__":
     if not os.path.exists(DB_FAISS_PATH):
@@ -184,4 +201,4 @@ if __name__ == "__main__":
             print("Failed to create vector store. Exiting.")
             exit(1)
     port = int(os.getenv('PORT', 5001))
-    app.run(debug=os.getenv('FLASK_ENV') == 'development', port=port)
+    socketio.run(app, debug=os.getenv('FLASK_ENV') == 'development', host='localhost', port=port)

@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { MessageSquare, X, Send, Loader2 } from 'lucide-react'
 import { format } from 'date-fns'
+import { io, Socket } from 'socket.io-client'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -31,7 +32,7 @@ const INITIAL_MESSAGE: Message = {
   timestamp: new Date()
 }
 
-const API_ENDPOINT = 'https://dev.srv618269.hstgr.cloud/chat/ask'
+const SOCKET_URL = 'http://localhost:5001'
 
 export default function BotWidget() {
   const [isOpen, setIsOpen] = useState(false)
@@ -41,6 +42,36 @@ export default function BotWidget() {
   const [error, setError] = useState<string | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
+  const socketRef = useRef<Socket | null>(null)
+
+  useEffect(() => {
+    if (isOpen) {
+      socketRef.current = io(SOCKET_URL)
+
+      socketRef.current.on('connect', () => {
+        console.log('Connected to WebSocket')
+      })
+
+      socketRef.current.on('message', (data: ChatResponse) => {
+        if (data.error) {
+          setError(data.error)
+        } else {
+          addMessage(data.response, 'bot')
+        }
+        setIsLoading(false)
+      })
+
+      socketRef.current.on('disconnect', () => {
+        console.log('Disconnected from WebSocket')
+      })
+    }
+
+    return () => {
+      if (socketRef.current) {
+        socketRef.current.disconnect()
+      }
+    }
+  }, [isOpen])
 
   useEffect(() => {
     if (isOpen && inputRef.current) {
@@ -61,50 +92,15 @@ export default function BotWidget() {
     }])
   }
 
-  const sendMessageToAPI = async (message: string): Promise<ChatResponse> => {
-    try {
-      const response = await fetch(API_ENDPOINT, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message, chat_history: messages.map(m => `${m.sender}: ${m.text}`) })
-      })
-
-      if (!response.ok) {
-        throw new Error('API request failed')
-      }
-
-      const data: ChatResponse = await response.json()
-      console.log('API Response:', data)
-      
-      if (!data.response) {
-        throw new Error('Empty response from API')
-      }
-
-      setError(null)
-      return data
-    } catch (error) {
-      console.error('Error in sendMessageToAPI:', error)
-      setError('Failed to connect to the chat service')
-      throw error
-    }
-  }
-
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!inputMessage.trim() || isLoading) return
+    if (!inputMessage.trim() || isLoading || !socketRef.current) return
 
     setIsLoading(true)
     addMessage(inputMessage, 'user')
     setInputMessage('')
 
-    try {
-      const chatResponse = await sendMessageToAPI(inputMessage)
-      addMessage(chatResponse.response, 'bot')
-    } catch (error) {
-      addMessage('Sorry, I couldn\'t process your request. Please try again later.', 'bot')
-    } finally {
-      setIsLoading(false)
-    }
+    socketRef.current.emit('message', { message: inputMessage })
   }
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -181,7 +177,7 @@ export default function BotWidget() {
                 onChange={(e) => setInputMessage(e.target.value)}
                 onKeyPress={handleKeyPress}
                 placeholder="Type your message..."
-                className="flex-1 min-h-[60px] max-h-[120px]"
+                className="flex-1  min-h-[60px] max-h-[120px]"
                 disabled={isLoading}
               />
               <Button

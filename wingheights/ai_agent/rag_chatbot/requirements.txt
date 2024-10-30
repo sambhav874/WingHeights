@@ -11,3 +11,4 @@ sentencepiece
 langchain_community
 flask
 flask_cors
+flask-socketio
