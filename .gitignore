@@ -3,7 +3,5 @@ rag_env
 .env.development
 venv
 .DS_Store
-ecosystem.config.dev.js
-ecosystem.config.prod.js
-ecosystem.config.js
 appointment_details.csv
+deploy.sh
