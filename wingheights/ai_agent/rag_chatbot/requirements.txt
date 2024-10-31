@@ -12,3 +12,6 @@ langchain_community
 flask
 flask_cors
 flask_socketio
+logging
+eventlet
+gunicorn
