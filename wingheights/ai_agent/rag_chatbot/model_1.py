@@ -4,16 +4,37 @@ from flask_cors import CORS
 import os
 import csv
 import ollama
+import logging
+from datetime import datetime
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_community.vectorstores import FAISS
 from langchain.document_loaders import PyPDFLoader, DirectoryLoader
 from dotenv import load_dotenv
 
+# Configure logging
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler('chat_server.log'),
+        logging.StreamHandler()
+    ]
+)
+logger = logging.getLogger(__name__)
+
 load_dotenv()
 app = Flask(__name__)
-CORS(app)
-socketio = SocketIO(app, cors_allowed_origins="*")
+CORS(app, resources={r"/*": {"origins": "*"}})
+socketio = SocketIO(
+    app,
+    cors_allowed_origins="*",
+    logger=True,
+    engineio_logger=True,
+    ping_timeout=60,
+    ping_interval=25,
+    async_mode='eventlet'
+)
 
 # Constants
 DATA_PATH = os.getenv('DATA_PATH', 'data/')
@@ -53,7 +74,7 @@ Helpful answer:
 
 def create_vector_db():
     if not os.path.exists(DATA_PATH) or not os.listdir(DATA_PATH):
-        print(f"No PDF files found in {DATA_PATH}. Please add your PDF files and restart the application.")
+        logger.warning(f"No PDF files found in {DATA_PATH}. Please add your PDF files and restart the application.")
         return None
 
     loader = DirectoryLoader(DATA_PATH, glob="*.pdf", loader_cls=PyPDFLoader)
@@ -67,29 +88,31 @@ def create_vector_db():
     db = FAISS.from_documents(texts, embeddings)
     os.makedirs(os.path.dirname(DB_FAISS_PATH), exist_ok=True)
     db.save_local(DB_FAISS_PATH)
-    print(f"Vector store created and saved to {DB_FAISS_PATH}")
+    logger.info(f"Vector store created and saved to {DB_FAISS_PATH}")
     return db
 
 def load_vector_db():
     if not os.path.exists(DB_FAISS_PATH):
-        print("Vector store not found. Creating new vector store...")
+        logger.info("Vector store not found. Creating new vector store...")
         return create_vector_db()
     embeddings = HuggingFaceEmbeddings(model_name=EMBEDDINGS_MODEL, model_kwargs={"device": "cpu"})
     return FAISS.load_local(DB_FAISS_PATH, embeddings, allow_dangerous_deserialization=True)
 
 def load_llm():
     def ollama_chat(query, context=""):
-        response = ollama.chat(
-            model=LLAMA_MODEL, 
-            messages=[
-                {"role": "system", "content": custom_prompt_template.format(context=context, question=query)},
-                {"role": "user", "content": query}
-            ]
-        )
-        if response and 'message' in response and 'content' in response['message']:
-            return response['message']['content']
-        else:
-            return "I apologize, but I couldn't process your request. How else can I assist you with our insurance services?"
+        try:
+            response = ollama.chat(
+                model=LLAMA_MODEL, 
+                messages=[
+                    {"role": "system", "content": custom_prompt_template.format(context=context, question=query)},
+                    {"role": "user", "content": query}
+                ]
+            )
+            if response and 'message' in response and 'content' in response['message']:
+                return response['message']['content']
+        except Exception as e:
+            logger.error(f"Error in ollama_chat: {str(e)}")
+        return "I apologize, but I couldn't process your request. How else can I assist you with our insurance services?"
 
     return ollama_chat
 
@@ -97,22 +120,33 @@ def retrieval_qa_chain(llm, db):
     retriever = db.as_retriever(search_kwargs={'k': 2})
 
     def qa_chain(query):
-        docs = retriever.get_relevant_documents(query)
-        context = "\n".join([doc.page_content for doc in docs])
-        response = llm(query, context)
-        return response
+        try:
+            docs = retriever.get_relevant_documents(query)
+            context = "\n".join([doc.page_content for doc in docs])
+            response = llm(query, context)
+            return response
+        except Exception as e:
+            logger.error(f"Error in qa_chain: {str(e)}")
+            return "I apologize, but I encountered an error processing your request."
 
     return qa_chain
 
-db = load_vector_db()
-llm = load_llm()
-qa_chain = retrieval_qa_chain(llm, db)
-
-chat_sessions = {}
+# Initialize the components
+try:
+    db = load_vector_db()
+    llm = load_llm()
+    qa_chain = retrieval_qa_chain(llm, db)
+    chat_sessions = {}
+except Exception as e:
+    logger.error(f"Error initializing components: {str(e)}")
+    raise
 
 @socketio.on('connect')
 def handle_connect():
     session_id = request.sid
+    logger.info(f"Client connected: {session_id}")
+    logger.debug(f"Connection headers: {request.headers}")
+    
     chat_sessions[session_id] = {
         'appointment_details': {},
         'booking_confirmed': False,
@@ -124,22 +158,31 @@ def handle_connect():
 @socketio.on('disconnect')
 def handle_disconnect():
     session_id = request.sid
+    logger.info(f"Client disconnected: {session_id}")
     if session_id in chat_sessions:
         del chat_sessions[session_id]
     leave_room(session_id)
 
+@socketio.on_error()
+def error_handler(e):
+    logger.error(f"SocketIO error: {str(e)}")
+    emit('message', {'error': 'An internal error occurred'})
+
 @socketio.on('message')
 def handle_message(data):
     session_id = request.sid
+    logger.info(f"Received message from {session_id}: {data}")
+    
     user_input = data.get('message')
     
     if not user_input:
+        logger.warning(f"Empty message received from {session_id}")
         emit('message', {'error': "No message provided"})
         return
 
-    session = chat_sessions[session_id]
-
     try:
+        session = chat_sessions[session_id]
+
         if session['appointment_details'] and session['booking_confirmed']:
             appointment_fields = ["Name", "Contact Number", "Email", "Appointment Date", "Insurance Type"]
             current_field = appointment_fields[len(session['appointment_details'])]
@@ -155,9 +198,12 @@ def handle_message(data):
                     summary += f"{field}: {session['appointment_details'].get(field, 'Not provided')}\n"
                 response = f"Thank you for providing all the details. Here's a summary of your appointment:\n\n{summary}\nWe look forward to assisting you!"
                 
-                with open('appointment_details.csv', mode='a', newline='', encoding='utf-8') as file:
-                    writer = csv.writer(file)
-                    writer.writerow([session['appointment_details'].get(field, 'Not provided') for field in appointment_fields])
+                try:
+                    with open('appointment_details.csv', mode='a', newline='', encoding='utf-8') as file:
+                        writer = csv.writer(file)
+                        writer.writerow([session['appointment_details'].get(field, 'Not provided') for field in appointment_fields])
+                except Exception as e:
+                    logger.error(f"Error writing to CSV: {str(e)}")
                 
                 session['appointment_details'] = {}
                 session['booking_confirmed'] = False
@@ -184,6 +230,7 @@ def handle_message(data):
         token_count = len(response.split())
         max_tokens = 2000
 
+        logger.info(f"Sending response to {session_id}: {response[:100]}...")
         emit('message', {
             "response": response,
             "requires_input": requires_input,
@@ -191,14 +238,33 @@ def handle_message(data):
             "max_tokens": max_tokens
         })
     except Exception as e:
+        logger.error(f"Error processing message: {str(e)}", exc_info=True)
         emit('message', {"error": str(e)})
 
 if __name__ == "__main__":
-    if not os.path.exists(DB_FAISS_PATH):
-        print("Vector store not found. Creating new vector store...")
-        db = create_vector_db()
-        if db is None:
-            print("Failed to create vector store. Exiting.")
-            exit(1)
-    port = int(os.getenv('PORT', 5001))
-    socketio.run(app, debug=os.getenv('FLASK_ENV') == 'development', host='localhost', port=port)
+    try:
+        if not os.path.exists(DB_FAISS_PATH):
+            logger.info("Vector store not found. Creating new vector store...")
+            db = create_vector_db()
+            if db is None:
+                logger.error("Failed to create vector store.")
+                exit(1)
+        
+        try:
+            import eventlet
+            eventlet.monkey_patch()
+        except ImportError:
+            logger.warning("Eventlet not installed. WebSocket performance might be affected.")
+        
+        port = int(os.getenv('PORT', 5002))
+        logger.info(f"Starting server on port {port}")
+        socketio.run(
+            app,
+            debug=True,
+            host='0.0.0.0',
+            port=port,
+            allow_unsafe_werkzeug=True
+        )
+    except Exception as e:
+        logger.error(f"Server startup error: {str(e)}", exc_info=True)
+        raise

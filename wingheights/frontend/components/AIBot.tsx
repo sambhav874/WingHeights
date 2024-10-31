@@ -32,7 +32,7 @@ const INITIAL_MESSAGE: Message = {
   timestamp: new Date()
 }
 
-const SOCKET_URL = 'http://localhost:5001'
+const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL as string;
 
 export default function BotWidget() {
   const [isOpen, setIsOpen] = useState(false)
@@ -40,20 +40,40 @@ export default function BotWidget() {
   const [inputMessage, setInputMessage] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [isConnected, setIsConnected] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const socketRef = useRef<Socket | null>(null)
 
   useEffect(() => {
-    if (isOpen) {
-      socketRef.current = io(SOCKET_URL)
+    if (isOpen && !socketRef.current) {
+      console.log('Attempting to connect to WebSocket...')
+      
+      socketRef.current = io(SOCKET_URL, {
+        transports: ['websocket', 'polling'],
+        reconnection: true,
+        reconnectionAttempts: 5,
+        reconnectionDelay: 1000,
+        timeout: 20000,
+        forceNew: true
+      })
 
       socketRef.current.on('connect', () => {
-        console.log('Connected to WebSocket')
+        console.log('Connected to WebSocket', socketRef.current?.id)
+        setIsConnected(true)
+        setError(null)
+      })
+
+      socketRef.current.on('connect_error', (error) => {
+        console.error('Connection error:', error)
+        setIsConnected(false)
+        setError(`Connection error: ${error.message}`)
       })
 
       socketRef.current.on('message', (data: ChatResponse) => {
+        console.log('Received message:', data)
         if (data.error) {
+          console.error('Message error:', data.error)
           setError(data.error)
         } else {
           addMessage(data.response, 'bot')
@@ -61,14 +81,26 @@ export default function BotWidget() {
         setIsLoading(false)
       })
 
-      socketRef.current.on('disconnect', () => {
-        console.log('Disconnected from WebSocket')
+      socketRef.current.on('disconnect', (reason) => {
+        console.log('Disconnected from WebSocket:', reason)
+        setIsConnected(false)
+        if (reason === 'io server disconnect') {
+          socketRef.current?.connect()
+        }
+      })
+
+      socketRef.current.on('error', (error) => {
+        console.error('Socket error:', error)
+        setError(`Socket error: ${error.message}`)
       })
     }
 
     return () => {
       if (socketRef.current) {
+        console.log('Cleaning up WebSocket connection...')
         socketRef.current.disconnect()
+        socketRef.current = null
+        setIsConnected(false)
       }
     }
   }, [isOpen])
@@ -77,6 +109,7 @@ export default function BotWidget() {
     if (isOpen && inputRef.current) {
       inputRef.current.focus()
     }
+  
   }, [isOpen])
 
   useEffect(() => {
@@ -94,13 +127,19 @@ export default function BotWidget() {
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!inputMessage.trim() || isLoading || !socketRef.current) return
+    if (!inputMessage.trim() || isLoading || !socketRef.current || !isConnected) return
 
     setIsLoading(true)
     addMessage(inputMessage, 'user')
     setInputMessage('')
 
-    socketRef.current.emit('message', { message: inputMessage })
+    try {
+      socketRef.current.emit('message', { message: inputMessage })
+    } catch (error) {
+      console.error('Error sending message:', error)
+      setError('Failed to send message')
+      setIsLoading(false)
+    }
   }
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -124,7 +163,12 @@ export default function BotWidget() {
       {isOpen && (
         <div className="bg-background border border-border rounded-lg shadow-xl w-80 sm:w-96 flex flex-col h-[500px]">
           <div className="flex justify-between items-center p-4 border-b border-border">
-            <h2 className="text-lg font-semibold">Wing Heights AI Assistant</h2>
+            <div className="flex items-center gap-2">
+              <h2 className="text-lg font-semibold">Wing Heights AI Assistant</h2>
+              {isConnected && (
+                <div className="w-2 h-2 rounded-full bg-green-500" />
+              )}
+            </div>
             <Button
               variant="ghost"
               size="icon"
@@ -159,7 +203,7 @@ export default function BotWidget() {
                       : "bg-muted"
                   )}
                 >
-                  <p>{message.text}</p>
+                  <p className="whitespace-pre-wrap">{message.text}</p>
                   <div className="text-xs opacity-70 mt-1">
                     {format(message.timestamp, 'HH:mm')}
                   </div>
@@ -177,13 +221,13 @@ export default function BotWidget() {
                 onChange={(e) => setInputMessage(e.target.value)}
                 onKeyPress={handleKeyPress}
                 placeholder="Type your message..."
-                className="flex-1  min-h-[60px] max-h-[120px]"
-                disabled={isLoading}
+                className="flex-1 min-h-[60px] max-h-[120px]"
+                disabled={isLoading || !isConnected}
               />
               <Button
                 type="submit"
                 size="icon"
-                disabled={isLoading || !inputMessage.trim()}
+                disabled={isLoading || !inputMessage.trim() || !isConnected}
               >
                 {isLoading ? (
                   <Loader2 className="h-5 w-5 animate-spin" />
