@@ -1,3 +1,5 @@
+import eventlet
+eventlet.monkey_patch()
 from flask import Flask, request
 from flask_socketio import SocketIO, emit, join_room, leave_room
 from flask_cors import CORS
@@ -249,13 +251,7 @@ if __name__ == "__main__":
             if db is None:
                 logger.error("Failed to create vector store.")
                 exit(1)
-        
-        try:
-            import eventlet
-            eventlet.monkey_patch()
-        except ImportError:
-            logger.warning("Eventlet not installed. WebSocket performance might be affected.")
-        
+                
         port = int(os.getenv('PORT', 5002))
         logger.info(f"Starting server on port {port}")
         socketio.run(
