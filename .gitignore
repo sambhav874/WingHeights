@@ -6,3 +6,6 @@ venv
 appointment_details.csv
 deploy.sh
 deploy.sh.save
+ecosystem.config.js
+wingheights/deploy.sh
+wingheights/ecosystem.config.js
