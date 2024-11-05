@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useEffect, useRef } from 'react'
-import { MessageSquare, X, Send, Loader2 } from 'lucide-react'
+import { MessageSquare, X, Send, Loader2, AlertTriangle } from 'lucide-react'
 import { format } from 'date-fns'
 import { io, Socket } from 'socket.io-client'
 import { cn } from '@/lib/utils'
@@ -25,18 +25,13 @@ interface ChatResponse {
   error?: string
 }
 
-const INITIAL_MESSAGE: Message = {
-  id: 1,
-  text: "Hello! I'm an AI assistant for Wing Heights Ghana Insurance. How can I help you today?",
-  sender: 'bot',
-  timestamp: new Date()
-}
+
 
 const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL as string;
 
 export default function BotWidget() {
   const [isOpen, setIsOpen] = useState(false)
-  const [messages, setMessages] = useState<Message[]>([INITIAL_MESSAGE])
+  const [messages, setMessages] = useState<Message[]>([])
   const [inputMessage, setInputMessage] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -47,6 +42,11 @@ export default function BotWidget() {
 
   useEffect(() => {
     if (isOpen && !socketRef.current) {
+      if (!SOCKET_URL) {
+        setError("This service is not available for this version of the website.")
+        return;
+      }
+
       console.log('Attempting to connect to WebSocket...')
       
       socketRef.current = io(SOCKET_URL, {
@@ -109,7 +109,6 @@ export default function BotWidget() {
     if (isOpen && inputRef.current) {
       inputRef.current.focus()
     }
-  
   }, [isOpen])
 
   useEffect(() => {
@@ -161,12 +160,14 @@ export default function BotWidget() {
         </Button>
       )}
       {isOpen && (
-        <div className="bg-background border border-border rounded-lg shadow-xl w-80 sm:w-96 flex flex-col h-[500px]">
+        <div className="bg-background border border-border rounded-lg shadow-xl w-80 sm:w-96 flex flex-col h-[500px] relative overflow-hidden">
           <div className="flex justify-between items-center p-4 border-b border-border">
             <div className="flex items-center gap-2">
               <h2 className="text-lg font-semibold">Wing Heights AI Assistant</h2>
-              {isConnected && (
-                <div className="w-2 h-2 rounded-full bg-green-500" />
+              {isConnected ? (
+                <div className="w-2 h-2 rounded-full bg-green-500" title="Connected" />
+              ) : (
+                <div className="w-2 h-2 rounded-full bg-red-500" title="Disconnected" />
               )}
             </div>
             <Button
@@ -180,13 +181,6 @@ export default function BotWidget() {
           </div>
 
           <ScrollArea className="flex-1 p-4">
-            {error && (
-              <Alert variant="destructive" className="mb-4">
-                <AlertTitle>Error</AlertTitle>
-                <AlertDescription>{error}</AlertDescription>
-              </Alert>
-            )}
-            
             {messages.map((message) => (
               <div
                 key={message.id}
@@ -222,12 +216,12 @@ export default function BotWidget() {
                 onKeyPress={handleKeyPress}
                 placeholder="Type your message..."
                 className="flex-1 min-h-[60px] max-h-[120px]"
-                disabled={isLoading || !isConnected}
+                disabled={isLoading || !isConnected || !SOCKET_URL}
               />
               <Button
                 type="submit"
                 size="icon"
-                disabled={isLoading || !inputMessage.trim() || !isConnected}
+                disabled={isLoading || !inputMessage.trim() || !isConnected || !SOCKET_URL}
               >
                 {isLoading ? (
                   <Loader2 className="h-5 w-5 animate-spin" />
@@ -237,6 +231,16 @@ export default function BotWidget() {
               </Button>
             </div>
           </form>
+
+          {error && (
+            <div className="absolute inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4">
+              <Alert variant="destructive" className="max-w-[90%]">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertTitle>Error</AlertTitle>
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            </div>
+          )}
         </div>
       )}
     </div>
