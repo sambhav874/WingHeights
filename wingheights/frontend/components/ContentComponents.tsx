@@ -260,7 +260,7 @@ export function Slider({ files, className, ...props }: SliderProps) {
           {files.map((file, index) => {
             const imageUrl = file.url.startsWith('http') 
               ? file.url 
-              : `${API_URL}/${file.url}`
+              : `${API_URL}${file.url}`
 
             return (
               <div
