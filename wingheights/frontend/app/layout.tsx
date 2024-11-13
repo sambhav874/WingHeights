@@ -2,7 +2,9 @@ import type { Metadata } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
 import BotWidget from "@/components/AIBot";
-import Navbar from "@/components/Navbar";
+import { getNavigation } from '@/lib/api'
+import { MainNavigation } from "@/components/MainNavigation";
+import { Footer } from "@/components/Footer";
 
 const geistSans = localFont({
   src: "./fonts/GeistVF.woff",
@@ -20,17 +22,19 @@ export const metadata: Metadata = {
   description: "Ghana's only insurance solution !",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+
+  const navigation = await getNavigation();
+  
   return (
     <html lang="en">
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         <div className="min-h-screen flex flex-col">
-          
-          <Navbar />
+        {navigation && <MainNavigation items={navigation} />}
           
           <main >
             {children}
@@ -38,10 +42,10 @@ export default function RootLayout({
           </main>
 
           
-          <footer className="bg-gray-200 p-4">
-            <div className="container mx-auto text-center">
-              &copy; {new Date().getFullYear()} Wing Heights. All rights reserved.
-            </div>
+          <footer className="bg-gray-200 ">
+            
+             <Footer items={navigation} />
+            
           </footer>
         </div>
       </body>

@@ -1,44 +1,82 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import Image from "next/image"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import InsuranceQuoteForm from "@/components/InsuranceQuoteForm"
+import Image from 'next/image'
+import { Card } from '@/components/ui/card'
+import { InsuranceQuoteForm } from '@/components/InsuranceQuoteForm'
+import { Media, TwoColumnFormLayout } from '@/components/ContentComponents'
 
-type Insurance = {
+interface MediaItem {
+  __component: string
   id: number
- 
+  caption: string | null
+  media: {
+    id: number
     name: string
-    description: string
-  
+    alternativeText: string | null
+    width: number
+    height: number
+    url: string
+  }
 }
 
-export default function Component() {
-  const [insurances, setInsurances] = useState<Insurance[]>([])
+interface FormLayoutItem {
+  __component: string
+  id: number
+  leftColumn: Array<{
+    type: string
+    level?: number
+    children: Array<{
+      text: string
+      type: string
+      bold?: boolean
+    }>
+  }>
+  rightColumn: {
+    id: number
+    title: string
+  }
+}
+
+interface GlobalContent {
+  id: number
+  documentId: string
+  content: Array<MediaItem | FormLayoutItem>
+}
+
+export default function Home() {
+  const [globalContent, setGlobalContent] = useState<GlobalContent | null>(null)
 
   useEffect(() => {
-    const fetchInsurances = async () => {
+    const fetchGlobalContent = async () => {
       try {
-        const response = await fetch(
-          `${process.env.NEXT_PUBLIC_STRAPI_API_URL}/api/insurances`)
+        const response = await fetch(`${process.env.NEXT_PUBLIC_STRAPI_API_URL}/api/global?populate[content][populate]=*`)
         const data = await response.json()
-        setInsurances(data.data)
+        setGlobalContent(data.data)
       } catch (error) {
-        console.error('Error fetching insurances:', error)
+        console.error('Error fetching global content:', error)
       }
     }
 
-    fetchInsurances()
+    fetchGlobalContent()
   }, [])
+
+  if (!globalContent) {
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <div className="text-[#1E2C6B] text-lg">Loading...</div>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-white">
       <main>
-        <section className="bg-purple-900 text-white py-20 relative overflow-hidden">
+        <section className="bg-[#1E2C6B] text-white py-20 relative overflow-hidden">
           <div className="container mx-auto px-4 flex flex-col md:flex-row items-center">
             <div className="md:w-1/2">
               <h1 className="text-5xl font-bold mb-4">Wing Heights Ghana</h1>
-              <p className="text-xl mb-8">Enabling #BetterFutures</p>
+              <p className="text-xl mb-8">Enabling <span className="text-[#C4A484]">#BetterFutures</span></p>
             </div>
             <div className="md:w-1/2 relative">
               <Image
@@ -60,52 +98,41 @@ export default function Component() {
         </section>
 
         <section className="py-20">
-          <div className="container mx-auto px-4 flex flex-col md:flex-row">
-            <div className="md:w-2/3 pr-8">
-              <img src="hollard-ghana_homepage.svg" alt="Hollard Ghana Homepage" />
-              <h2 className="text-3xl font-bold mb-4">
-                Insuring you, everyone and <span className="text-orange-500">everything you love</span>
-              </h2>
-              <p className="mb-4">
-                Worry less and do more with your insurance policy by your favourite insurance group, Wing Heights Ghana,
-                comprised of subsidiaries, Wing Heights Insurance (general insurance) and Wing Heights Life Assurance
-                (life insurance).
-              </p>
-              <p className="mb-4">
-                Thinking about taking out a life insurance policy that covers your family in the event of your passing
-                is not high on anyone's list of priorities. But it's essential. Hollard has made this and all personal
-                and business insurance matters as smooth and simplified as possible; you don't have to think about it
-                except to know that it's covered.
-              </p>
-              <p className="mb-4">
-                Worry less and do more with Ghana's trusted insurance company in your corner.
-              </p>
-              <p className="font-bold">Let's get started.</p>
-            </div>
-
-            <div className="md:w-1/3 mt-8 md:mt-0">
-              <InsuranceQuoteForm />
-            </div>
-          </div>
-        </section>
-
-        <section className="py-20 bg-gray-50">
           <div className="container mx-auto px-4">
-            <h2 className="text-3xl font-bold mb-8 text-center">Our Insurance Types</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              {insurances.map((insurance) => (
-                <Card key={insurance.id} className="transition-all duration-300 hover:shadow-lg hover:-translate-y-1">
-                  <CardHeader>
-                    <CardTitle className="flex items-center">
-                      {insurance.name}
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <CardDescription>{insurance.description}</CardDescription>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
+            {globalContent.content.map((item, index) => {
+              if (item.__component === 'shared.media') {
+                const mediaItem = item as MediaItem
+                return (
+                  <Media 
+                    className="border-none shadow-none  duration-300"
+                    key={index} 
+                    media={{
+                      url: mediaItem.media.url,
+                      alternativeText: mediaItem.media.alternativeText || undefined,
+                      width: mediaItem.media.width,
+                      height: mediaItem.media.height
+                    }} 
+                    caption={mediaItem.caption || undefined} 
+                  />
+                )
+              }
+              if (item.__component === 'forms.two-column-form-layout') {
+                const formItem = item as FormLayoutItem
+                return (
+                  <Card className="bg-white border-none shadow-none   duration-300 p-2 rounded-lg">
+                    <TwoColumnFormLayout
+                      key={index}
+                      leftColumn={formItem.leftColumn}
+                      rightColumn={
+                        <InsuranceQuoteForm title={formItem.rightColumn.title} />
+                      }
+                      className="text-[#1E2C6B]"
+                    />
+                  </Card>
+                )
+              }
+              return null
+            })}
           </div>
         </section>
       </main>
