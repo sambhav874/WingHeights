@@ -1,0 +1,16 @@
+{
+  "collectionName": "components_forms_insurance_quote_forms",
+  "info": {
+    "displayName": "Insurance Quote Form",
+    "description": ""
+  },
+  "options": {},
+  "attributes": {
+    "title": {
+      "type": "enumeration",
+      "enum": [
+        "Insurance Quote Form"
+      ]
+    }
+  }
+}

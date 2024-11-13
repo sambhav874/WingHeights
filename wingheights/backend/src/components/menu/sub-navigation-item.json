@@ -1,0 +1,16 @@
+{
+  "collectionName": "components_menu_sub_navigation_items",
+  "info": {
+    "displayName": "Sub Navigation Item",
+    "description": ""
+  },
+  "options": {},
+  "attributes": {
+    "label": {
+      "type": "string"
+    },
+    "link": {
+      "type": "string"
+    }
+  }
+}

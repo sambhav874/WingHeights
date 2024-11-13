@@ -1,0 +1,16 @@
+{
+  "collectionName": "components_shared_two_column_layouts",
+  "info": {
+    "displayName": "TwoColumnLayout",
+    "description": ""
+  },
+  "options": {},
+  "attributes": {
+    "leftColumn": {
+      "type": "blocks"
+    },
+    "rightColumn": {
+      "type": "blocks"
+    }
+  }
+}

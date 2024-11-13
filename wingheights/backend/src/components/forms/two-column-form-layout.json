@@ -1,0 +1,17 @@
+{
+  "collectionName": "components_forms_two_column_form_layouts",
+  "info": {
+    "displayName": "TwoColumnFormLayout"
+  },
+  "options": {},
+  "attributes": {
+    "leftColumn": {
+      "type": "blocks"
+    },
+    "rightColumn": {
+      "type": "component",
+      "repeatable": false,
+      "component": "forms.insurance-quote-form"
+    }
+  }
+}

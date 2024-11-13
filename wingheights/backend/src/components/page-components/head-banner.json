@@ -1,0 +1,16 @@
+{
+  "collectionName": "components_page_components_head_banners",
+  "info": {
+    "displayName": "headBanner",
+    "description": ""
+  },
+  "options": {},
+  "attributes": {
+    "title": {
+      "type": "string"
+    },
+    "smallDescription": {
+      "type": "string"
+    }
+  }
+}

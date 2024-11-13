@@ -4,7 +4,8 @@
   "info": {
     "singularName": "page",
     "pluralName": "pages",
-    "displayName": "Page"
+    "displayName": "Page",
+    "description": ""
   },
   "options": {
     "draftAndPublish": true
@@ -14,18 +15,23 @@
     "title": {
       "type": "string"
     },
+    "content2": {
+      "type": "dynamiczone",
+      "components": [
+        "shared.quote",
+        "shared.media",
+        "shared.rich-text",
+        "shared.two-column-layout",
+        "page-components.slider",
+        "seo.seo",
+        "forms.insurance-quote-form",
+        "page-components.head-banner",
+        "forms.two-column-form-layout"
+      ]
+    },
     "slug": {
       "type": "uid",
       "targetField": "title"
-    },
-    "content": {
-      "type": "richtext"
-    },
-    "seo": {
-      "displayName": "SEO",
-      "type": "component",
-      "repeatable": false,
-      "component": "seo.seo"
     }
   }
 }
