@@ -24,8 +24,16 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-
 import { toast } from '@/hooks/use-toast'
+
+const insuranceTypes = [
+  "Auto Insurance",
+  "Home Insurance",
+  "Life Insurance",
+  "Health Insurance",
+  "Business Insurance",
+  "Travel Insurance",
+]
 
 const formSchema = z.object({
   name: z.string().min(2, {
@@ -43,6 +51,9 @@ const formSchema = z.object({
   appointmentTime: z.string({
     required_error: 'Please select a time for the appointment.',
   }),
+  insuranceType: z.string({
+    required_error: 'Please select an insurance type.',
+  }),
 })
 
 interface InsuranceQuoteFormProps {
@@ -57,13 +68,16 @@ export function InsuranceQuoteForm({ title }: InsuranceQuoteFormProps) {
       contact_number: '',
       email: '',
       appointmentTime: '',
+      insuranceType: '',
     },
   })
 
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [formStatus, setFormStatus] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
 
   async function onSubmit(values: z.infer<typeof formSchema>) {
     setIsSubmitting(true)
+    setFormStatus(null)
     try {
       const response = await fetch('/api/submit-insurance-quote', {
         method: 'POST',
@@ -74,21 +88,15 @@ export function InsuranceQuoteForm({ title }: InsuranceQuoteFormProps) {
       })
 
       if (!response.ok) {
-        throw new Error('Failed to submit form')
+        const errorData = await response.json()
+        throw new Error(errorData.message || 'Failed to submit form')
       }
 
-      toast({
-        title: "Appointment Scheduled",
-        description: "Your appointment has been successfully scheduled. We'll contact you soon to confirm the details.",
-      })
+      const responseData = await response.json()
+      setFormStatus({ message: responseData.message || "Your appointment has been successfully scheduled. We'll contact you soon to confirm the details.", type: 'success' })
       form.reset()
     } catch (error) {
-      console.error('Error submitting form:', error)
-      toast({
-        title: "Error",
-        description: "There was an error submitting the form. Please try again.",
-        variant: "destructive",
-      })
+      setFormStatus({ message: error instanceof Error ? error.message : "There was an error submitting the form. Please try again.", type: 'error' })
     } finally {
       setIsSubmitting(false)
     }
@@ -97,6 +105,13 @@ export function InsuranceQuoteForm({ title }: InsuranceQuoteFormProps) {
   return (
     <div className="my-2 p-4 bg-white shadow-md rounded-lg border border-[#1E2C6B]/10">
       <h2 className="text-3xl font-bold mb-6 text-[#1E2C6B]">{title}</h2>
+      
+      {formStatus && (
+        <div className={`mb-4 p-4 rounded ${formStatus.type === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+          {formStatus.message}
+        </div>
+      )}
+
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
           <FormField
@@ -134,6 +149,30 @@ export function InsuranceQuoteForm({ title }: InsuranceQuoteFormProps) {
                 <FormControl>
                   <Input placeholder="johndoe@example.com" {...field} className="border-[#1E2C6B]/20 focus:border-[#1E2C6B]" />
                 </FormControl>
+                <FormMessage className="text-[#C4A484]" />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="insuranceType"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel className="text-[#1E2C6B]">Insurance Type</FormLabel>
+                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <FormControl>
+                    <SelectTrigger className="border-[#1E2C6B]/20 focus:border-[#1E2C6B]">
+                      <SelectValue placeholder="Select an insurance type" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    {insuranceTypes.map((type) => (
+                      <SelectItem key={type} value={type}>
+                        {type}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
                 <FormMessage className="text-[#C4A484]" />
               </FormItem>
             )}
@@ -206,10 +245,10 @@ export function InsuranceQuoteForm({ title }: InsuranceQuoteFormProps) {
           />
           <Button 
             type="submit" 
-            className="w-full bg-[#1E2C6B] hover:bg-[#1E2C6B]/90 text-white" 
+            className="w-full bg-[#1E2C6B] hover:bg-[#1E2C6B]/90" 
             disabled={isSubmitting}
           >
-            {isSubmitting ? 'Submitting...' : 'Schedule Appointment'}
+            {isSubmitting ? 'Submitting...' : 'Submit'}
           </Button>
         </form>
       </Form>
