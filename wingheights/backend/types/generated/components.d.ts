@@ -7,7 +7,7 @@ export interface FormsInsuranceQuoteForm extends Struct.ComponentSchema {
     displayName: 'Insurance Quote Form';
   };
   attributes: {
-    title: Schema.Attribute.Enumeration<['Insurance Quote Form']>;
+    title: Schema.Attribute.Enumeration<['Book an Appointment .']>;
   };
 }
 
