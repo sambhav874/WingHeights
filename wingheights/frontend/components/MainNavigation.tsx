@@ -37,14 +37,8 @@ export function MainNavigation({ items }: MainNavigationProps) {
     const topLevelItems: NavigationItem[] = []
     const itemMap: Record<number, NavigationItem> = {}
 
-    const homeItem: NavigationItem = {
-      id: 0,
-      title: "Home",
-      path: "/",
-      type: "INTERNAL"
-    }
-    topLevelItems.push(homeItem)
-
+    
+    
     items.forEach(item => {
       itemMap[item.id] = { ...item, items: [] }
     })

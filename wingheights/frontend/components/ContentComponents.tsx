@@ -2,9 +2,9 @@
 
 import { useState } from 'react'
 import Image from 'next/image'
-import { Card } from '@/components/ui/card'
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
-import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Link } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import ReactMarkdown from 'react-markdown'
 import { InsuranceQuoteForm } from './InsuranceQuoteForm'
@@ -390,3 +390,231 @@ export function TwoColumnFormLayout({ leftColumn, rightColumn, className, ...pro
     </div>
   )
 }
+
+
+
+
+
+
+
+
+
+
+interface CardSectionProps {
+  title: string
+  description: string
+  cards: Array<{
+    id: string
+    title: string
+    content: string
+    image: {
+      url: string
+      alternativeText?: string
+      width: number
+      height: number
+    }
+    link?: string
+  }>
+}
+
+interface TextItem {
+  text: string
+  bold?: boolean
+  italic?: boolean
+  strikethrough?: boolean
+  underline?: boolean
+  isList?: boolean
+}
+
+const renderRichText = (textItems: TextItem[]): React.ReactNode => {
+  return textItems.map((item: TextItem, index: number) => {
+    let content: React.ReactNode = item.text.trim()
+
+    if (item.bold) content = <strong key={index}>{content}</strong>
+    if (item.italic) content = <em key={index}>{content}</em>
+    if (item.strikethrough) content = <s key={index}>{content}</s>
+    if (item.underline) content = <span key={index} style={{ textDecoration: 'underline' }}>{content}</span>
+
+    if (item.isList) {
+      content = <span key={index}>• {content}</span>
+    }
+
+    return <span key={index}>{content}</span>
+  })
+}
+
+const renderColumn = (column: any) => {
+  if (typeof column === 'string') {
+    return <ReactMarkdown>{column}</ReactMarkdown>
+  }
+  return column.map((item: any, index: number) => {
+    if (item.type === 'paragraph') {
+      return <div key={index}>{renderRichText(item.children)}</div>
+    }
+    if (item.type === 'heading') {
+      const HeadingTag = `h${item.level}` as keyof JSX.IntrinsicElements
+      return <HeadingTag key={index}>{renderRichText(item.children)}</HeadingTag>
+    }
+    if (item.type === 'list') {
+      return (
+        <ul key={index} className={item.format === 'ordered' ? 'list-decimal' : 'list-disc'}>
+          {item.children.map((listItem: any, listItemIndex: number) => (
+            <li key={listItemIndex}>
+              {renderRichText(listItem.children)}
+            </li>
+          ))}
+        </ul>
+      )
+    }
+    return null
+  })
+}
+
+import { displayRichText } from '@/lib/func'
+import { ContentItem } from '@/types'
+
+interface CardItemProps {
+  title: string
+  content: any
+  image: {
+    url: string
+    alternativeText?: string
+    width: number
+    height: number
+  }
+  link?: string
+}
+
+
+export function CardItem({ title, content, image, link }: CardItemProps) {
+    const baseUrl = process.env.NEXT_PUBLIC_STRAPI_API_URL || "http://localhost:1339";
+    const imageUrl = `${baseUrl}${image.url}`;
+  
+    const renderContent = (content: any) => {
+      if (typeof content === "string") {
+        return <ReactMarkdown>{content}</ReactMarkdown>;
+      }
+      if (Array.isArray(content)) {
+        return content.map((item: any, index: number) => {
+          if (item.type === "paragraph") {
+            return <p key={index} className="mb-2">{displayRichText(item.children)}</p>;
+          }
+          if (item.type === "heading") {
+            const HeadingTag = `h${item.level}` as keyof JSX.IntrinsicElements;
+            return <HeadingTag key={index} className="font-bold mb-2">{displayRichText(item.children)}</HeadingTag>;
+          }
+          if (item.type === "list") {
+            return (
+              <ul key={index} className={`${item.format === "ordered" ? "list-decimal" : "list-disc"} pl-5 mb-2`}>
+                {item.children.map((listItem: any, listItemIndex: number) => (
+                  <li key={listItemIndex} className="mb-1">{displayRichText(listItem.children)}</li>
+                ))}
+              </ul>
+            );
+          }
+          return null;
+        });
+      }
+      return null;
+    };
+  
+    return (
+      <Card className="flex flex-col bg-white shadow-xl rounded-lg overflow-hidden transition-all duration-300 hover:shadow-2xl hover:scale-105">
+        <div className="relative h-96 md:h-96 overflow-hidden">
+          <Image
+            src={imageUrl}
+            alt={image.alternativeText || title}
+            layout="fill"
+            objectFit="cover"
+            className="transition-transform duration-300 hover:scale-110 object-contain"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-[#1E2C6B] to-transparent opacity-50"></div>
+        </div>
+        <CardHeader className="px-6 pt-4 pb-2 bg-[#1E2C6B]">
+          <CardTitle className="text-white text-xl font-bold">{title}</CardTitle>
+        </CardHeader>
+        <CardContent className="flex-grow px-6 py-4">
+          <div className="prose prose-sm text-gray-700">{renderContent(content)}</div>
+        </CardContent>
+        {link && (
+          <CardFooter className="p-4 bg-[#C4A484] bg-opacity-20">
+            <Button
+              asChild
+              className="w-full bg-[#1E2C6B] hover:bg-[#C4A484] text-white text-sm py-2 px-4 rounded-md flex items-center justify-center gap-2 transition-all duration-300"
+            >
+              <a href={link} className="flex items-center justify-center gap-2">
+                Learn More
+                <Link className="h-4 w-4" />
+              </a>
+            </Button>
+          </CardFooter>
+        )}
+      </Card>
+    );
+  }
+  
+
+
+
+
+  export function CardSection({ title, description, cards }: CardSectionProps) {
+    const renderContent = (content: any) => {
+      if (typeof content === "string") {
+        return <ReactMarkdown>{content}</ReactMarkdown>;
+      }
+      if (Array.isArray(content)) {
+        return content.map((item: any, index: number) => {
+          if (item.type === "paragraph") {
+            return <p key={index} className="mb-2">{displayRichText(item.children)}</p>;
+          }
+          if (item.type === "heading") {
+            const HeadingTag = `h${item.level}` as keyof JSX.IntrinsicElements;
+            return <HeadingTag key={index} className="font-bold mb-2">{displayRichText(item.children)}</HeadingTag>;
+          }
+          if (item.type === "list") {
+            return (
+              <ul key={index} className={`${item.format === "ordered" ? "list-decimal" : "list-disc"} pl-5 mb-2`}>
+                {item.children.map((listItem: any, listItemIndex: number) => (
+                  <li key={listItemIndex} className="mb-1">{displayRichText(listItem.children)}</li>
+                ))}
+              </ul>
+            );
+          }
+          return null;
+        });
+      }
+      return null;
+    };
+  
+    return (
+      <section className="py-16 px-6 lg:px-12 bg-gradient-to-b from-[#1E2C6B] via-[#f3f4f6] to-white">
+        {(title || description) && (
+          <div className="text-center mb-12">
+            {title && (
+              <h2 className="text-4xl font-semibold text-white mb-4 relative inline-block">
+                {title}
+                <span className="absolute bottom-0 left-0 w-full h-1 bg-[#C4A484]"></span>
+              </h2>
+            )}
+            {description && (
+              <div className="text-lg text-gray-200 mt-4 max-w-2xl mx-auto bg-[#1E2C6B] bg-opacity-80 p-6 rounded-lg shadow-lg">
+                {renderContent(description)}
+              </div>
+            )}
+          </div>
+        )}
+  
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+          {cards.map((card, index) => (
+            <CardItem
+              key={index}
+              title={card.title}
+              content={card.content}
+              image={card.image}
+              link={card.link}
+            />
+          ))}
+        </div>
+      </section>
+    );
+  }
