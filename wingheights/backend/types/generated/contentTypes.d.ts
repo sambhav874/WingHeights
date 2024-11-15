@@ -498,6 +498,8 @@ export interface ApiPagePage extends Struct.CollectionTypeSchema {
         'forms.insurance-quote-form',
         'page-components.head-banner',
         'forms.two-column-form-layout',
+        'page-components.card-section',
+        'page-components.card',
       ]
     >;
     createdAt: Schema.Attribute.DateTime;

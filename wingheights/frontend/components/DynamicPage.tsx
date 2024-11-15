@@ -1,6 +1,4 @@
-'use client'
-
-import  { HeadBanner,Quote, Media, RichText, TwoColumnLayout, Slider, SEO, TwoColumnFormLayout } from '@/components/ContentComponents'
+import { HeadBanner, Quote, Media, RichText, TwoColumnLayout, Slider, SEO, TwoColumnFormLayout, CardSection, CardItem } from '@/components/ContentComponents'
 import { InsuranceQuoteForm } from '@/components/InsuranceQuoteForm'
 import { ContentItem, PageData } from '@/types'
 
@@ -44,34 +42,45 @@ export function DynamicPage({ pageData }: DynamicPageProps) {
           } 
           key={item.id} 
         />
+        case 'page-components.card-section':
+            return <CardSection title={item.title} description={item.description} cards={item.cards} key={item.id} />
+          
       default:
         return null
     }
   }
 
-  const headBanner = pageData.content2.find(item => item.__component === 'page-components.head-banner')
-  const seoComponent = pageData.content2.find(item => item.__component === 'seo.seo')
+  const content2 = pageData.content2 || []
+  const headBanner = content2.find(item => item.__component === 'page-components.head-banner')
+  const seoComponent = content2.find(item => item.__component === 'seo.seo')
 
   return (
     <>
-      {seoComponent && <SEO 
-        metaTitle={seoComponent.metaTitle} 
-        metaDescription={seoComponent.metaDescription} 
-        key={seoComponent.id} 
-      />}
-      {headBanner && <HeadBanner 
-        title={headBanner.title} 
-        smallDescription={headBanner.smallDescription} 
-        key={headBanner.id} 
-      />}
+      {seoComponent && (
+        <SEO 
+          metaTitle={seoComponent.metaTitle} 
+          metaDescription={seoComponent.metaDescription} 
+          key={seoComponent.id} 
+        />
+      )}
+      {headBanner && (
+        <HeadBanner 
+          title={headBanner.title} 
+          smallDescription={headBanner.smallDescription} 
+          key={headBanner.id} 
+        />
+      )}
       <div className="container mx-auto px-4 py-8">
-        {pageData.content2.map(item => {
+        {content2.map(item => {
           if (item.__component !== 'seo.seo' && item.__component !== 'page-components.head-banner') {
             return <div key={item.id}>{renderContent(item)}</div>
           }
+          
           return null
         })}
       </div>
     </>
   )
 }
+
+export default DynamicPage

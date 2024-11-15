@@ -51,6 +51,31 @@ export interface MenuSubNavigationItem extends Struct.ComponentSchema {
   };
 }
 
+export interface PageComponentsCard extends Struct.ComponentSchema {
+  collectionName: 'components_page_components_cards';
+  info: {
+    displayName: 'Card';
+  };
+  attributes: {
+    content: Schema.Attribute.Blocks;
+    image: Schema.Attribute.Media<'images' | 'files' | 'videos' | 'audios'>;
+    link: Schema.Attribute.String;
+    title: Schema.Attribute.String;
+  };
+}
+
+export interface PageComponentsCardSection extends Struct.ComponentSchema {
+  collectionName: 'components_page_components_card_sections';
+  info: {
+    displayName: 'CardSection';
+  };
+  attributes: {
+    cards: Schema.Attribute.Component<'page-components.card', true>;
+    description: Schema.Attribute.Blocks;
+    title: Schema.Attribute.String;
+  };
+}
+
 export interface PageComponentsHeadBanner extends Struct.ComponentSchema {
   collectionName: 'components_page_components_head_banners';
   info: {
@@ -172,6 +197,8 @@ declare module '@strapi/strapi' {
       'forms.two-column-form-layout': FormsTwoColumnFormLayout;
       'menu.navigation-item': MenuNavigationItem;
       'menu.sub-navigation-item': MenuSubNavigationItem;
+      'page-components.card': PageComponentsCard;
+      'page-components.card-section': PageComponentsCardSection;
       'page-components.head-banner': PageComponentsHeadBanner;
       'page-components.slider': PageComponentsSlider;
       'seo.seo': SeoSeo;
