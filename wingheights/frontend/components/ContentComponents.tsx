@@ -486,9 +486,10 @@ interface CardItemProps {
 }
 
 
+
 export function CardItem({ title, content, image, link }: CardItemProps) {
-    const baseUrl = process.env.NEXT_PUBLIC_STRAPI_API_URL || "http://localhost:1339";
-    const imageUrl = `${baseUrl}${image.url}`;
+    const baseUrl = process.env.NEXT_PUBLIC_STRAPI_API_URL ;
+    const imageUrl = image ? `${baseUrl}${image.url}` : "";
   
     const renderContent = (content: any) => {
       if (typeof content === "string") {
@@ -520,22 +521,35 @@ export function CardItem({ title, content, image, link }: CardItemProps) {
   
     return (
       <Card className="flex flex-col bg-white shadow-xl rounded-lg overflow-hidden transition-all duration-300 hover:shadow-2xl hover:scale-105">
-        <div className="relative h-96 md:h-96 overflow-hidden">
-          <Image
-            src={imageUrl}
-            alt={image.alternativeText || title}
-            layout="fill"
-            objectFit="cover"
-            className="transition-transform duration-300 hover:scale-110 object-contain"
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-[#1E2C6B] to-transparent opacity-50"></div>
-        </div>
-        <CardHeader className="px-6 pt-4 pb-2 bg-[#1E2C6B]">
-          <CardTitle className="text-white text-xl font-bold">{title}</CardTitle>
-        </CardHeader>
-        <CardContent className="flex-grow px-6 py-4">
-          <div className="prose prose-sm text-gray-700">{renderContent(content)}</div>
-        </CardContent>
+        {image && (
+          <div className="relative h-96 md:h-96 overflow-hidden">
+            <Image
+              src={imageUrl}
+              alt={image.alternativeText || "Card image"}
+              layout="fill"
+              objectFit="cover"
+              className="transition-transform duration-300 hover:scale-110 object-contain"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-[#1E2C6B] to-transparent opacity-50"></div>
+          </div>
+        )}
+  
+        {(title || content) && (
+          <CardHeader className="px-6 pt-4 pb-2 bg-[#1E2C6B]">
+            {title && (
+              <CardTitle className="text-white text-xl font-bold">{title}</CardTitle>
+            )}
+          </CardHeader>
+        )}
+  
+        {(content || title) && (
+          <CardContent className="flex-grow px-6 py-4">
+            {content && (
+              <div className="prose prose-sm text-gray-700">{renderContent(content)}</div>
+            )}
+          </CardContent>
+        )}
+  
         {link && (
           <CardFooter className="p-4 bg-[#C4A484] bg-opacity-20">
             <Button
@@ -552,9 +566,6 @@ export function CardItem({ title, content, image, link }: CardItemProps) {
       </Card>
     );
   }
-  
-
-
 
 
   export function CardSection({ title, description, cards }: CardSectionProps) {
