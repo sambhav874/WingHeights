@@ -1,4 +1,4 @@
-import { HeadBanner, Quote, Media, RichText, TwoColumnLayout, Slider, SEO, TwoColumnFormLayout, CardSection, CardItem } from '@/components/ContentComponents'
+import { HeadBanner, Quote, Media, RichText, TwoColumnLayout, Slider, SEO, TwoColumnFormLayout, CardSection } from '@/components/ContentComponents'
 import { InsuranceQuoteForm } from '@/components/InsuranceQuoteForm'
 import { ContentItem, PageData } from '@/types'
 

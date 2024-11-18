@@ -38,7 +38,9 @@ export default async function RootLayout({
           
           <main >
             {children}
-            
+            { process.env.NEXT_PUBLIC_SOCKET_URL && (
+              <BotWidget />
+            )}
           </main>
 
           
