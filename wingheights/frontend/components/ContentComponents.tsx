@@ -503,13 +503,12 @@ function CardItem({ title, content, image, link }: CardItemProps) {
       onMouseLeave={() => setIsHovered(false)}
     >
       {image && (
-        <div className="relative h-72 overflow-hidden">
+        <div className="relative h-96 overflow-hidden">
           <Image
             src={imageUrl}
             alt={image.alternativeText || 'Card image'}
             layout="fill"
-            objectFit="cover"
-            className="transition-all duration-700 ease-out group-hover:scale-110 group-hover:rotate-1"
+            className="transition-all object-cover h-full duration-700 ease-out group-hover:scale-110 group-hover:rotate-1"
           />
           <div
             className={`absolute inset-0 bg-gradient-to-t from-primary/90 via-primary/40 to-transparent transition-opacity duration-300 ${
@@ -521,7 +520,7 @@ function CardItem({ title, content, image, link }: CardItemProps) {
               isHovered ? 'opacity-100 rotate-12' : 'opacity-0 rotate-0'
             }`}
           >
-            <Sparkles className="w-5 h-5 text-secondary" />
+            
           </div>
         </div>
       )}
