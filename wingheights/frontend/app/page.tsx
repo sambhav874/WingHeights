@@ -80,7 +80,7 @@ export default function Home() {
             </div>
             <div className="md:w-1/2 relative">
               <Image
-                src="/Subject-removebg-preview.png"
+                src="/prop.png"
                 alt="Insurance scenarios illustration"
                 width={600}
                 height={300}

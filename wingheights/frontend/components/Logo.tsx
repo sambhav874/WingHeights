@@ -3,9 +3,9 @@ import Image from "next/image"
 
 const Logo = () => {
   return (
-    <div className="logo h-auto bg-white bg-opacity-30 rounded ">
+    <div className="logo h-auto min-w-fit rounded ">
       <Image 
-        src="/logo.png" 
+        src="/logo1.png" 
         height={96} // Increase the height
         width={144}  // Increase the width
         alt="Wing Heights Insurance Brokers Limited"

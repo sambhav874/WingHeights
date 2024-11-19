@@ -498,7 +498,7 @@ function CardItem({ title, content, image, link }: CardItemProps) {
 
   return (
     <Card
-      className="group relative flex flex-col bg-card rounded-2xl overflow-hidden transition-all duration-300 hover:-translate-y-2 hover:shadow-lg"
+      className="group relative flex flex-col h-full bg-card rounded-2xl overflow-hidden transition-all duration-300 hover:-translate-y-2 hover:shadow-lg"
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
@@ -526,7 +526,7 @@ function CardItem({ title, content, image, link }: CardItemProps) {
         </div>
       )}
 
-      <CardHeader className={`px-8 pt-8 pb-4 backdrop-blur-md ${image ? 'mt-[-3rem] relative z-10' : ''}`}>
+      <CardHeader className={`px-8 pt-8 pb-4 backdrop-blur-xl bg-opacity-10 ${image ? 'mt-[-3rem] relative z-10' : ''}`}>
         {title && (
           <CardTitle className="text-3xl font-serif italic leading-tight text-card-foreground   text-[#1E2C6B]">
             <span className="inline-block animate-slideInLeft">{title}</span>
@@ -539,9 +539,9 @@ function CardItem({ title, content, image, link }: CardItemProps) {
         )}
       </CardHeader>
 
-      <CardContent className="flex-grow px-8 py-6">
+      <CardContent className="flex-grow px-4 sm:px-6 md:px-8 py-2 sm:py-4">
         {content && (
-          <div className="prose prose-lg max-w-none prose-headings:text-primary prose-headings:font-serif prose-p:text-muted-foreground prose-p:leading-relaxed prose-p:tracking-wide prose-a:text-primary prose-a:no-underline prose-a:border-b prose-a:border-primary hover:prose-a:text-primary/80 animate-fadeIn">
+          <div className="prose prose-sm sm:prose-base lg:prose-lg max-w-none prose-headings:text-primary prose-headings:font-serif prose-p:text-muted-foreground prose-p:leading-relaxed prose-p:tracking-wide prose-a:text-primary prose-a:no-underline prose-a:border-b prose-a:border-primary hover:prose-a:text-primary/80 animate-fadeIn overflow-auto">
             {renderContent(content)}
           </div>
         )}
@@ -625,7 +625,7 @@ export function CardSection({ title, description, cards }: CardSectionProps) {
   }
 
   return (
-    <section className="relative py-32 px-8 lg:px-16 bg-gradient-to-b from-background via-background/95 to-background/80 overflow-hidden">
+    <section className="relative py-32 px-4 lg:px-10 bg-gradient-to-b from-background via-background/95 to-background/80 overflow-hidden">
       <div className="absolute inset-0  opacity-5" />
       <div className="absolute inset-0  mix-blend-soft-light opacity-50" />
       
@@ -638,7 +638,7 @@ export function CardSection({ title, description, cards }: CardSectionProps) {
           <div className="text-center mb-20">
             {title && (
               <h2 className="relative inline-block group animate-fadeIn">
-                <span className="text-5xl md:text-6xl font-serif italic text-primary mb-6 block">
+                <span className="text-3xl md:text-6xl font-serif italic text-primary mb-6 block">
                   {title}
                 </span>
                 <span className="absolute -bottom-2 left-1/2 w-1/2 h-0.5 bg-secondary transform -translate-x-1/2 transition-all duration-300 group-hover:w-full" />
@@ -657,7 +657,7 @@ export function CardSection({ title, description, cards }: CardSectionProps) {
           </div>
         )}
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10 lg:gap-14">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-10">
           {cards.map((card, index) => (
             <div key={index} className={`animate-fadeIn animation-delay-${index * 100}`}>
               <CardItem

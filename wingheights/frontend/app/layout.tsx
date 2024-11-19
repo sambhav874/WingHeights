@@ -5,6 +5,7 @@ import BotWidget from "@/components/AIBot";
 import { getNavigation } from '@/lib/api'
 import { MainNavigation } from "@/components/MainNavigation";
 import { Footer } from "@/components/Footer";
+import InsuranceQuoteWidget from "@/components/InsuranceQuoteWidget";
 
 const geistSans = localFont({
   src: "./fonts/GeistVF.woff",
@@ -27,28 +28,30 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-
   const navigation = await getNavigation();
   
   return (
     <html lang="en">
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         <div className="min-h-screen flex flex-col">
-        {navigation && <MainNavigation items={navigation} />}
+          {navigation && <MainNavigation items={navigation} />}
           
-          <main >
+          <main className="flex-grow">
             {children}
-            { process.env.NEXT_PUBLIC_SOCKET_URL && (
-              <BotWidget />
-            )}
           </main>
-
           
-          <footer className="bg-gray-200 ">
-            
-             <Footer items={navigation} />
-            
+          <footer className="bg-gray-200">
+            <Footer items={navigation} />
           </footer>
+        </div>
+
+        <div className="fixed bottom-6 right-6 z-50 flex flex-col-reverse items-end gap-6">
+          <div className="relative mb-4">
+            {process.env.NEXT_PUBLIC_SOCKET_URL && <BotWidget />}
+          </div>
+          <div className="relative">
+            <InsuranceQuoteWidget />
+          </div>
         </div>
       </body>
     </html>
