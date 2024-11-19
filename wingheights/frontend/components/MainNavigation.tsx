@@ -1,11 +1,10 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { ChevronDown, Menu, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { Button } from '@/components/ui/button'
 import Logo from './Logo'
 
 interface NavigationItem {
@@ -28,17 +27,26 @@ interface MainNavigationProps {
   items: NavigationItem[]
 }
 
+
 export function MainNavigation({ items }: MainNavigationProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [openDropdowns, setOpenDropdowns] = useState<number[]>([])
   const pathname = usePathname()
+  const [isMobile, setIsMobile] = useState(false)
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 1024)
+    }
+    handleResize()
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
 
   const organizedItems = useMemo(() => {
     const topLevelItems: NavigationItem[] = []
     const itemMap: Record<number, NavigationItem> = {}
 
-    
-    
     items.forEach(item => {
       itemMap[item.id] = { ...item, items: [] }
     })
@@ -73,17 +81,19 @@ export function MainNavigation({ items }: MainNavigationProps) {
     return item.path === "/" ? "/" : item.related?.data?.slug || item.path
   }
 
-  const renderNavItems = (navItems: NavigationItem[], isMobile = false) => {
+  const renderNavItems = (navItems: NavigationItem[], level = 0) => {
     return navItems.map((item) => (
       <li key={item.id} className={cn("relative group", isMobile && "w-full")}>
         <div className="flex items-center">
           <Link
             href={getItemPath(item)}
             className={cn(
-              "flex-grow py-2 px-4 transition duration-300",
-              isMobile ? "text-[#C4A484] hover:bg-[#1E2C6B]/90" : "text-white hover:text-[#C4A484]",
-              pathname === getItemPath(item) && "bg-[#1E2C6B]/90"
+              "flex-grow py-2 px-2 lg:px-3 text-base lg:text-lg transition duration-300",
+              isMobile ? "text-[#C4A484] hover:bg-[#152052]" : "text-white hover:text-[#C4A484]",
+              pathname === getItemPath(item) && "bg-[#152052]",
+              level > 0 && "pl-6 lg:pl-4"
             )}
+            onClick={() => isMobile && setIsOpen(false)}
           >
             {item.title}
           </Link>
@@ -92,19 +102,23 @@ export function MainNavigation({ items }: MainNavigationProps) {
               onClick={() => toggleDropdown(item.id)}
               className={cn(
                 "p-2 transition duration-300",
-                isMobile ? "text-[#C4A484] hover:bg-[#1E2C6B]/90" : "text-white hover:text-[#C4A484]"
+                isMobile ? "text-[#C4A484] hover:bg-[#152052]" : "text-white hover:text-[#C4A484]"
               )}
+              aria-expanded={openDropdowns.includes(item.id)}
+              aria-label={`Toggle ${item.title} submenu`}
             >
-              <ChevronDown className={cn("h-4 w-4 transition-transform", openDropdowns.includes(item.id) && "rotate-180")} />
+              <ChevronDown className={cn("h-5 w-5 transition-transform", openDropdowns.includes(item.id) && "rotate-180")} />
             </button>
           )}
         </div>
         {item.items && item.items.length > 0 && (
           <ul className={cn(
-            "bg-[#1E2C6B] shadow-md min-w-[200px] rounded-md overflow-hidden",
-            isMobile ? (openDropdowns.includes(item.id) ? "block" : "hidden") : "hidden group-hover:block absolute left-0 top-full"
+            "bg-[#1E2C6B] shadow-lg min-w-[250px] rounded-md overflow-hidden",
+            isMobile 
+              ? (openDropdowns.includes(item.id) ? "block" : "hidden") 
+              : "hidden group-hover:block absolute left-0 top-full z-50"
           )}>
-            {renderNavItems(item.items, isMobile)}
+            {renderNavItems(item.items, level + 1)}
           </ul>
         )}
       </li>
@@ -112,35 +126,41 @@ export function MainNavigation({ items }: MainNavigationProps) {
   }
 
   return (
-    <header className="bg-[#1E2C6B] text-white z-50">
-      <div className="container mx-auto px-4 py-4">
+    <header className="bg-[#1E2C6B] text-white shadow-md sticky top-0 z-50">
+      <div className="px-20 mx-auto md:px-10  py-3 lg:py-4">
         <div className="flex items-center justify-between">
           <Link href="/" className="flex items-center">
             <Logo />
           </Link>
-          <nav className="hidden md:flex space-x-6">
-            <ul className="flex space-x-6">
+          <nav className="hidden lg:flex space-x-1">
+            <ul className="flex space-x-2">
               {renderNavItems(organizedItems)}
             </ul>
           </nav>
           
           <button
-            className="md:hidden"
+            className="lg:hidden p-2 rounded-md hover:bg-[#152052] transition duration-300"
             onClick={() => setIsOpen(!isOpen)}
             aria-label="Toggle mobile menu"
+            aria-expanded={isOpen}
           >
             {isOpen ? (
-              <X className="w-6 h-6 text-[#C4A484]" />
+              <X className="w-6 h-6 sm:w-8 sm:h-8 text-[#C4A484]" />
             ) : (
-              <Menu className="w-6 h-6 text-[#C4A484]" />
+              <Menu className="w-6 h-6 sm:w-8 sm:h-8 text-[#C4A484]" />
             )}
           </button>
         </div>
       </div>
       {/* Mobile menu */}
-      <nav className={cn("md:hidden", isOpen ? "block" : "hidden")}>
-        <ul className="px-2 pt-2 pb-4 space-y-1">
-          {renderNavItems(organizedItems, true)}
+      <nav 
+        className={cn(
+          "lg:hidden border-t border-[#152052] transition-all duration-300 ease-in-out overflow-hidden",
+          isOpen ? "max-h-[calc(100vh-4rem)] opacity-100" : "max-h-0 opacity-0"
+        )}
+      >
+        <ul className="px-4 py-4 space-y-2 max-h-[calc(100vh-4rem)] overflow-y-auto">
+          {renderNavItems(organizedItems)}
         </ul>
       </nav>
     </header>

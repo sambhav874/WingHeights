@@ -27,10 +27,38 @@ interface FooterProps {
 }
 
 const socialLinks = [
-  { name: 'Facebook', icon: Facebook, href: 'https://facebook.com' },
-  { name: 'Twitter', icon: Twitter, href: 'https://twitter.com' },
-  { name: 'Instagram', icon: Instagram, href: 'https://instagram.com' },
-  { name: 'LinkedIn', icon: Linkedin, href: 'https://linkedin.com' },
+  { 
+    name: 'Facebook', 
+    icon: Facebook, 
+    href: 'https://facebook.com/Wing-height-Insurance-brokers-limited',
+    handle: 'Wing-height Insurance brokers limited'
+  },
+  { 
+    name: 'Twitter', 
+    icon: Twitter, 
+    href: 'https://twitter.com/WingHeights',
+    handle: '@WingHeights'
+  },
+  { 
+    name: 'Instagram', 
+    icon: Instagram, 
+    href: 'https://instagram.com/Wingheights_insurancebrokers',
+    handle: 'Wingheights_insurancebrokers'
+  },
+  { 
+    name: 'TikTok', 
+    icon: ({ className }: { className?: string }) => (
+      <svg 
+        viewBox="0 0 24 24" 
+        className={className}
+        fill="currentColor"
+      >
+        <path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z"/>
+      </svg>
+    ),
+    href: 'https://tiktok.com/@Wingheights_insurance',
+    handle: 'Wingheights_insurance'
+  }
 ]
 
 export function Footer({ items }: FooterProps) {
@@ -126,17 +154,17 @@ export function Footer({ items }: FooterProps) {
           <div>
             <h2 className="text-2xl font-bold mb-4">Wing Heights Ghana</h2>
             <p className="mb-4">Enabling #BetterFutures</p>
-            <div className="flex space-x-4">
+            <div className="flex flex-col space-y-4">
               {socialLinks.map((link) => (
                 <a
                   key={link.name}
                   href={link.href}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="hover:text-[#C4A484] transition-colors"
+                  className="flex items-center hover:text-[#C4A484] transition-colors"
                 >
-                  <link.icon className="h-6 w-6" />
-                  <span className="sr-only">{link.name}</span>
+                  <link.icon className="h-6 w-6 mr-2" />
+                  <span>{link.handle}</span>
                 </a>
               ))}
             </div>
@@ -149,7 +177,7 @@ export function Footer({ items }: FooterProps) {
           </div>
           <div>
             <h3 className="text-xl font-semibold mb-4">Contact Us</h3>
-            <ul className="space-y-2">
+            <ul className="space-y-4">
               <li className="flex items-center">
                 <Mail className="h-5 w-5 mr-2 flex-shrink-0" />
                 <a href="mailto:wingheightslimited@gmail.com" className="hover:text-[#C4A484] transition-colors">
@@ -159,7 +187,7 @@ export function Footer({ items }: FooterProps) {
               <li className="flex items-center">
                 <Phone className="h-5 w-5 mr-2 flex-shrink-0" />
                 <a href="tel:+233530900124" className="hover:text-[#C4A484] transition-colors">
-                  +233 530 900 124 
+                  +233 (0) 530 900 124
                 </a>
               </li>
               <li className="flex items-center">
@@ -172,8 +200,8 @@ export function Footer({ items }: FooterProps) {
               </li>
               <li className="flex items-start">
                 <MapPin className="h-5 w-5 mr-2 mt-1 flex-shrink-0" />
-                <span>6th Avenue May's Plaza, Community 8, Tumatu Lane, Tema, Greater Accra
-                P.O Box BT 371 Tema, GA/R</span>
+                <span>6th Avenue May's Plaza, Community 8, Tumatu Lane, Tema, Greater Accra<br />
+                P.O. Box BT 371, Tema (GT-117-9943)</span>
               </li>
             </ul>
           </div>
