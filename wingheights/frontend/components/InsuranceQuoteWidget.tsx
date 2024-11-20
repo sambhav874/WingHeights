@@ -15,7 +15,7 @@ export default function InsuranceQuoteWidget() {
         className="flex items-center gap-2 bg-[#1E2C6B] hover:bg-[#1E2C6B]/90 text-white px-4 py-2 rounded-lg shadow-lg"
       >
         <ShieldCheck className="h-5 w-5" />
-        <span>Get Insurance Quote</span>
+        <span>Book an appointment</span>
       </Button>
 
       {isOpen && (
@@ -32,7 +32,7 @@ export default function InsuranceQuoteWidget() {
             
             <div className="p-6">
               <InsuranceQuoteForm 
-                title="Request an Insurance Quote"
+                title="Book an Appointment "
               />
             </div>
           </div>
