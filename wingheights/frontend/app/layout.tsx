@@ -19,8 +19,8 @@ const geistMono = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "Wing Heights Ghana",
-  
+  title: 'Wing Heights Ghana',
+  description: 'Ghana\'s leading insurance brokers',
 };
 
 export default async function RootLayout({
