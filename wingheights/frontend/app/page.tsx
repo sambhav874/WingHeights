@@ -76,7 +76,7 @@ export default function Home() {
           <div className="container mx-auto px-4 flex flex-col md:flex-row items-center">
             <div className="md:w-1/2">
               <h1 className="text-5xl font-bold mb-4">Wing Heights Ghana</h1>
-              <p className="text-xl mb-8">Enabling <span className="text-[#C4A484]">#BetterFutures</span></p>
+              <p className="text-xl mb-8">Enabling <span className="text-[#C4A484]">#SaveMoney</span></p>
             </div>
             <div className="md:w-1/2 relative">
               <Image
