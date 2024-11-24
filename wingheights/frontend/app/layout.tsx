@@ -6,6 +6,8 @@ import { getNavigation } from '@/lib/api'
 import { MainNavigation } from "@/components/MainNavigation";
 import { Footer } from "@/components/Footer";
 import InsuranceQuoteWidget from "@/components/InsuranceQuoteWidget";
+import { TestContext } from "node:test";
+import Test from "@/components/Test";
 
 const geistSans = localFont({
   src: "./fonts/GeistVF.woff",
@@ -47,11 +49,9 @@ export default async function RootLayout({
 
         <div className="fixed bottom-6 right-6 z-50 flex flex-col-reverse items-end gap-6">
           <div className="relative mb-4">
-            {process.env.NEXT_PUBLIC_SOCKET_URL && <BotWidget />}
+            {process.env.NEXT_PUBLIC_SOCKET_URL && <Test />}
           </div>
-          <div className="relative">
-            <InsuranceQuoteWidget />
-          </div>
+          
         </div>
       </body>
     </html>
