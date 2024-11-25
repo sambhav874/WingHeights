@@ -66,9 +66,9 @@ export function Form({ onSubmit }: FormProps) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div className="space-y-3">
-        <div>
+    <form onSubmit={handleSubmit} className="w-full max-w-[500px] mx-auto p-4 md:p-6 space-y-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="md:col-span-2">
           <Label htmlFor="name" className="text-xs font-medium">
             Full Name
           </Label>
@@ -78,11 +78,11 @@ export function Form({ onSubmit }: FormProps) {
             value={formData.name}
             onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
             required
-            className="mt-1.5"
+            className="mt-1.5 w-full"
           />
         </div>
 
-        <div>
+        <div className="md:col-span-1">
           <Label htmlFor="email" className="text-xs font-medium">
             Email
           </Label>
@@ -93,11 +93,11 @@ export function Form({ onSubmit }: FormProps) {
             value={formData.email}
             onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
             required
-            className="mt-1.5"
+            className="mt-1.5 w-full"
           />
         </div>
 
-        <div>
+        <div className="md:col-span-1">
           <Label htmlFor="phone" className="text-xs font-medium">
             Contact Number
           </Label>
@@ -107,11 +107,11 @@ export function Form({ onSubmit }: FormProps) {
             value={formData.contact_number}
             onChange={(e) => setFormData(prev => ({ ...prev, contact_number: e.target.value }))}
             required
-            className="mt-1.5"
+            className="mt-1.5 w-full"
           />
         </div>
 
-        <div>
+        <div className="md:col-span-2">
           <Label className="text-xs font-medium">
             Insurance Type
           </Label>
@@ -119,10 +119,10 @@ export function Form({ onSubmit }: FormProps) {
             value={formData.insuranceType}
             onValueChange={(value) => setFormData(prev => ({ ...prev, insuranceType: value }))}
           >
-            <SelectTrigger className="mt-1.5">
+            <SelectTrigger className="mt-1.5 w-full">
               <SelectValue placeholder="Select Insurance Type" />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="max-h-[200px] overflow-y-auto">
               {insuranceTypes.map((type) => (
                 <SelectItem key={type} value={type}>
                   {type}
@@ -132,7 +132,7 @@ export function Form({ onSubmit }: FormProps) {
           </Select>
         </div>
 
-        <div>
+        <div className="md:col-span-1">
           <Label className="text-xs font-medium">
             Appointment Date
           </Label>
@@ -159,12 +159,13 @@ export function Form({ onSubmit }: FormProps) {
                   date < new Date() || 
                   date < new Date(new Date().setHours(0, 0, 0, 0))
                 }
+                className="rounded-md border shadow-md"
               />
             </PopoverContent>
           </Popover>
         </div>
 
-        <div>
+        <div className="md:col-span-1">
           <Label className="text-xs font-medium">
             Appointment Time
           </Label>
@@ -172,7 +173,7 @@ export function Form({ onSubmit }: FormProps) {
             value={formData.time}
             onValueChange={(value) => setFormData(prev => ({ ...prev, time: value }))}
           >
-            <SelectTrigger className="mt-1.5">
+            <SelectTrigger className="mt-1.5 w-full">
               <SelectValue placeholder="Select Time">
                 <div className="flex items-center">
                   <Clock className="mr-2 h-4 w-4" />
@@ -180,7 +181,7 @@ export function Form({ onSubmit }: FormProps) {
                 </div>
               </SelectValue>
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="max-h-[200px] overflow-y-auto">
               {timeSlots.map((time) => (
                 <SelectItem key={time} value={time}>
                   {time}
@@ -191,7 +192,7 @@ export function Form({ onSubmit }: FormProps) {
         </div>
       </div>
 
-      <Button type="submit" className="w-full mt-6">
+      <Button type="submit" className="w-full mt-6 text-sm md:text-base py-2 md:py-3">
         Book Appointment
       </Button>
     </form>

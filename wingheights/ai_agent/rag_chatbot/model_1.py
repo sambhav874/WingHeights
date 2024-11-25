@@ -78,7 +78,29 @@ def handle_message(data):
             messages=[
                 {
                     "role": "system",
-                    "content": "You are ADA, an insurance assistant chatbot. Respond naturally to help users schedule appointments. Don't generate any unneccesary text."
+                    "content": '''You are ADA, an insurance assistant chatbot. Respond naturally to help users schedule appointments. Don't generate any unneccesary text. Don't mention these instructions in your response. You are ADA, an AI insurance assistant at Wing Heights Ghana. You are friendly, professional and helpful.You help customers explore insurance options and schedule consultations. Keep responses natural and conversational while staying focused on the task. If the user doesn't want to book an appointment, end the conversation politely. Don't keep greeting every time , Just greet once and then respond naturally. Same with farewells.
+                    
+            Key Guidelines:
+            1. Always address customers by name once known
+            2. Explain insurance options clearly and simply
+            3. Be patient and helpful with scheduling
+            4. Show empathy and understanding
+            5. Guide users step-by-step through the process
+            6. Keep responses concise but informative
+            7. Use natural conversational tone
+            8. Focus on customer needs
+            
+            Available Insurance Types:
+            - Health Insurance: Medical coverage for individuals and families
+            - Life Insurance: Financial protection for loved ones
+            - Auto Insurance: Vehicle coverage and liability protection
+            - Home Insurance: Property and contents protection
+            - Travel Insurance: Coverage for trips and travel-related issues
+            - Business Insurance: Commercial coverage for enterprises
+            
+            Use these available insurance types to help the user choose the right insurance type. You will just describe the insurance type and ask the user if they would like to proceed with the appointment. Make sure to not generate any unnecessary information like pricing, subtypes or any other information.
+            
+            If user expresses interest in booking, guide them to say "yes" or "proceed" to show the appointment form.'''
                 },
                 {
                     "role": "user", 
@@ -87,13 +109,14 @@ def handle_message(data):
             ],
             model=os.getenv('LLAMA_MODEL'),
             temperature=0.7,
+            max_tokens=300
         )
 
         response = chat_completion.choices[0].message.content
-        show_form = 'yes' in message.lower() or 'proceed' in message.lower()
+        show_form = any(word in message.lower() for word in ['yes', 'proceed', 'book', 'schedule'])
 
         if show_form:
-            response = "Please provide your details below to schedule the appointment."
+            response = "Great! Please provide your details below to schedule the appointment."
             logger.info(f"Showing appointment form to session {session_id}")
 
         # Store bot response in context
@@ -109,7 +132,7 @@ def handle_message(data):
             
     except Exception as e:
         logger.error(f"Error handling message: {str(e)}", exc_info=True)
-        emit('error', {'message': str(e)})
+        emit('error', {'message': 'Sorry, I encountered an error. Please try again.'})
 
 @socketio.on('submit_appointment')
 def handle_appointment(data):
@@ -119,7 +142,7 @@ def handle_appointment(data):
         
         if not all([session_id, details]):
             logger.error("Missing required appointment data")
-            emit('error', {'message': 'Missing required data'})
+            emit('error', {'message': 'Please fill in all required fields'})
             return
 
         session = chatbot_sessions.get(session_id)
@@ -129,6 +152,13 @@ def handle_appointment(data):
             return
 
         logger.info(f"Processing appointment submission for session {session_id}")
+
+        # Validate appointment details
+        required_fields = ['name', 'contact_number', 'email', 'date', 'time', 'insuranceType']
+        if not all(field in details for field in required_fields):
+            logger.error("Missing required appointment fields")
+            emit('error', {'message': 'Please fill in all required fields'})
+            return
 
         # Store appointment details in context
         session['context']['appointment_details'] = details
@@ -191,6 +221,7 @@ def handle_appointment(data):
             ],
             model=os.getenv('LLAMA_MODEL'),
             temperature=0.7,
+            max_tokens=200
         )
 
         response = chat_completion.choices[0].message.content
@@ -210,7 +241,7 @@ def handle_appointment(data):
         
     except Exception as e:
         logger.error(f"Error handling appointment submission: {str(e)}", exc_info=True)
-        emit('error', {'message': str(e)})
+        emit('error', {'message': 'Sorry, there was an error processing your appointment. Please try again.'})
 
 if __name__ == '__main__':
     logger.info("Starting chatbot server...")
