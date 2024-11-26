@@ -50,6 +50,7 @@ export default async function RootLayout({
         <div className="fixed bottom-6 right-6 z-50 flex flex-col-reverse items-end gap-6">
           <div className="relative mb-4">
             {process.env.NEXT_PUBLIC_SOCKET_URL && <Test />}
+            {!process.env.NEXT_PUBLIC_SOCKET_URL && <InsuranceQuoteWidget />}
           </div>
           
         </div>
