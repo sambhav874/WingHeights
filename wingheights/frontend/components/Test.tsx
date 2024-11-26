@@ -12,6 +12,7 @@ import { Loader2, Send, Bot, User, MessageSquare, X } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Form } from "./AppointmentForm"
 import { format } from "date-fns"
+import ReactMarkdown from 'react-markdown'
 
 interface Message {
   role: 'user' | 'bot'
@@ -56,7 +57,7 @@ export default function ChatWidget() {
         </div>
         <Button
           disabled
-          className="h-12 w-12 rounded-full shadow-lg opacity-50 cursor-not-allowed"
+          className="h-12 w-12 rounded-full shadow-lg opacity-50 cursor-not-allowed hover:scale-105 transition-all duration-300"
         >
           <MessageSquare className="h-6 w-6" />
         </Button>
@@ -179,9 +180,9 @@ export default function ChatWidget() {
     return (
       <Button
         onClick={toggleChat}
-        className="fixed bottom-4 right-4 h-12 w-12 rounded-full shadow-lg hover:scale-110 transition-transform"
+        className="fixed bottom-4 right-4 h-12 w-12 rounded-full shadow-xl hover:scale-110 transition-transform duration-300 bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70"
       >
-        <MessageSquare className="h-6 w-6" />
+        <MessageSquare className="h-6 w-6 text-white" />
       </Button>
     )
   }
@@ -189,13 +190,13 @@ export default function ChatWidget() {
   if (!connected) {
     return (
       <div className="fixed bottom-4 right-4 w-[90vw] md:w-[440px] lg:w-[500px]">
-        <Card className="h-[80vh] md:h-[700px] lg:h-[700px] flex items-center justify-center shadow-lg">
+        <Card className="h-[80vh] md:h-[700px] lg:h-[700px] flex items-center justify-center shadow-2xl border-opacity-50 backdrop-blur-sm bg-background/95">
           <CardContent>
             <div className="flex flex-col items-center gap-4">
-              <Loader2 className="h-8 w-8 animate-spin" />
-              <p>Connecting to chat server...</p>
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              <p className="text-muted-foreground font-medium">Connecting to chat server...</p>
               {error && (
-                <p className="text-destructive text-sm text-center">{error}</p>
+                <p className="text-destructive text-sm text-center font-medium bg-destructive/10 px-4 py-2 rounded-lg">{error}</p>
               )}
             </div>
           </CardContent>
@@ -206,22 +207,30 @@ export default function ChatWidget() {
 
   return (
     <div className="fixed bottom-4 right-4 w-[90vw] md:w-[440px] lg:w-[500px] z-50">
-      <Card className="h-[60vh] md:h-[500px] lg:h-[600px] sm:h-[900px] xs:h-[1200px] flex flex-col overflow-hidden shadow-lg">
-        <CardHeader className="px-4 py-3 border-b space-y-1">
+      <Card className="h-[60vh] md:h-[500px] lg:h-[600px] sm:h-[900px] xs:h-[1200px] flex flex-col overflow-hidden shadow-2xl border-opacity-50 backdrop-blur-sm bg-background/95">
+        <CardHeader className="px-4 py-3 border-b space-y-1 bg-gradient-to-r from-background to-background/95">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Avatar className="h-7 w-7 md:h-8 md:w-8">
-                <AvatarImage src="/bot-avatar.png" alt="ADA" />
-                <AvatarFallback>
-                  <Bot className="h-4 w-4 md:h-5 md:w-5" />
+            <div className="flex items-center gap-3">
+              <Avatar className="h-8 w-8 md:h-9 md:w-9 ring-2 ring-primary/20 ring-offset-2 ring-offset-background">
+                <AvatarImage src="/bot-avatar.png" alt="ADA" className="object-cover" />
+                <AvatarFallback className="bg-primary/10">
+                  <Bot className="h-5 w-5 md:h-6 md:w-6 text-primary" />
                 </AvatarFallback>
               </Avatar>
               <div>
-                <CardTitle className="text-sm md:text-base font-semibold">ADA Insurance Assistant</CardTitle>
-                <CardDescription className="text-[10px] md:text-xs">Online • Ready to help</CardDescription>
+                <CardTitle className="text-sm md:text-base font-semibold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">ADA Insurance Assistant</CardTitle>
+                <CardDescription className="text-[10px] md:text-xs flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span>
+                  Online • Ready to help
+                </CardDescription>
               </div>
             </div>
-            <Button variant="ghost" size="icon" onClick={toggleChat} className="h-8 w-8">
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={toggleChat} 
+              className="h-8 w-8 hover:bg-destructive/10 hover:text-destructive transition-colors"
+            >
               <X className="h-4 w-4" />
             </Button>
           </div>
@@ -229,53 +238,61 @@ export default function ChatWidget() {
 
         <CardContent className="flex-1 flex flex-col p-0 overflow-hidden">
           <ScrollArea className="flex-1 px-4 py-3">
-            <div className="space-y-3">
+            <div className="space-y-4">
               {messages.map((message, index) => (
                 <div
                   key={index}
                   className={cn(
-                    "flex items-end gap-2 group",
+                    "flex items-end gap-3 group transition-opacity duration-200",
                     message.role === 'user' && "justify-end"
                   )}
                 >
                   {message.role === 'bot' && (
-                    <Avatar className="h-7 w-7 shrink-0">
-                      <AvatarImage src="/bot-avatar.png" alt="ADA" />
-                      <AvatarFallback>
-                        <Bot className="h-4 w-4" />
+                    <Avatar className="h-8 w-8 shrink-0 ring-2 ring-primary/20">
+                      <AvatarImage src="/bot-avatar.png" alt="ADA" className="object-cover" />
+                      <AvatarFallback className="bg-primary/10">
+                        <Bot className="h-5 w-5 text-primary" />
                       </AvatarFallback>
                     </Avatar>
                   )}
                   <div
                     className={cn(
-                      "px-3 py-2 rounded-2xl max-w-[80%] break-words",
+                      "px-4 py-2.5 rounded-2xl max-w-[85%] break-words shadow-md transition-all duration-200",
                       message.role === 'user' 
-                        ? "bg-primary text-primary-foreground rounded-br-none" 
-                        : "bg-muted rounded-bl-none"
+                        ? "bg-gradient-to-r from-primary to-primary/90 text-white rounded-br-none" 
+                        : "bg-muted/50 backdrop-blur-sm rounded-bl-none hover:bg-muted/70"
                     )}
                   >
-                    <p className="text-xs md:text-sm">{message.content}</p>
-                    <span className="text-[8px] md:text-[10px] opacity-0 group-hover:opacity-60 transition-opacity">
+                    <div className={cn(
+                      "text-sm md:text-base prose prose-sm max-w-none",
+                      message.role === 'user' ? "text-white" : "dark:prose-invert"
+                    )}>
+                      <ReactMarkdown>{message.content}</ReactMarkdown>
+                    </div>
+                    <span className={cn(
+                      "text-[9px] md:text-[11px] opacity-0 group-hover:opacity-70 transition-opacity duration-300 mt-1 inline-block",
+                      message.role === 'user' ? "text-white/70" : "text-foreground/70"
+                    )}>
                       {format(new Date(message.timestamp), 'HH:mm')}
                     </span>
                   </div>
                   {message.role === 'user' && (
-                    <Avatar className="h-7 w-7 shrink-0">
-                      <AvatarFallback className="bg-primary">
-                        <User className="h-4 w-4 text-primary-foreground" />
+                    <Avatar className="h-8 w-8 shrink-0 ring-2 ring-primary/20">
+                      <AvatarFallback className="bg-gradient-to-r from-primary to-primary/80">
+                        <User className="h-5 w-5 text-white" />
                       </AvatarFallback>
                     </Avatar>
                   )}
                 </div>
               ))}
               {loading && (
-                <div className="flex items-center gap-2 text-muted-foreground">
-                  <Loader2 className="h-3 w-3 animate-spin" />
-                  <span className="text-xs">ADA is typing...</span>
+                <div className="flex items-center gap-2 text-muted-foreground pl-11">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
+                  <span className="text-xs font-medium">ADA is typing...</span>
                 </div>
               )}
               {error && (
-                <div className="mx-4 p-2 rounded-lg bg-destructive/10 text-destructive text-xs">
+                <div className="mx-4 p-3 rounded-lg bg-destructive/10 text-destructive text-xs font-medium border border-destructive/20">
                   {error}
                 </div>
               )}
@@ -285,7 +302,7 @@ export default function ChatWidget() {
 
           <Separator className="shrink-0" />
 
-          <div className="p-3 bg-background">
+          <div className="p-4 bg-gradient-to-b from-background/50 to-background">
             {showForm ? (
               <ScrollArea className="h-[250px] pr-4">
                 <Form onSubmit={handleFormSubmit} />
@@ -299,13 +316,13 @@ export default function ChatWidget() {
                   onKeyPress={handleKeyPress}
                   placeholder="Type your message..."
                   disabled={loading}
-                  className="flex-grow text-sm"
+                  className="flex-grow text-sm shadow-sm border-opacity-50 focus:border-primary/50 transition-all duration-200"
                 />
                 <Button 
                   onClick={handleSendMessage}
                   disabled={loading || !input.trim()}
                   size="icon"
-                  className="shrink-0 h-9 w-9"
+                  className="shrink-0 h-10 w-10 rounded-full shadow-md hover:shadow-lg transition-all duration-300 bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70"
                 >
                   {loading ? (
                     <Loader2 className="h-4 w-4 animate-spin" />

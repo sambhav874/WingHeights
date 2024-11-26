@@ -1,3 +1,4 @@
+from datetime import datetime
 import eventlet
 eventlet.monkey_patch()
 from flask import Flask
@@ -9,7 +10,7 @@ import os
 from dotenv import load_dotenv
 import csv
 import logging
-
+import tiktoken
 
 # Configure logging
 logging.basicConfig(
@@ -34,6 +35,12 @@ groq_client = Groq(api_key=os.getenv('GROQ_API_KEY'))
 CHATBOT_DATA_PATH = "chatbot_data.csv"
 APPOINTMENTS_CSV_PATH = "appointments.csv"
 USER_DATA_PATH = "user_data.csv"
+CHAT_HISTORY_PATH = "chat_history.csv"
+MAX_TOKENS = 1000
+
+def count_tokens(text):
+    encoding = tiktoken.get_encoding("cl100k_base")
+    return len(encoding.encode(text))
 
 @socketio.on('connect')
 def handle_connect():
@@ -42,7 +49,8 @@ def handle_connect():
         'state': 'initial',
         'context': {
             'messages': [],
-            'appointment_details': None
+            'appointment_details': None,
+            'total_tokens': 0
         }
     }
     logger.info(f"New client connected. Session ID: {session_id}")
@@ -65,6 +73,18 @@ def handle_message(data):
             emit('error', {'message': 'Invalid session'})
             return
 
+        # Check token count
+        message_tokens = count_tokens(message)
+        session['context']['total_tokens'] += message_tokens
+
+        if session['context']['total_tokens'] > MAX_TOKENS:
+            response = "I apologize, but you have reached the maximum token limit for this conversation. Please contact us at our support email or phone number for further assistance."
+            emit('response', {
+                'response': response,
+                'showForm': False
+            })
+            return
+
         logger.info(f"Message received from session {session_id}: {message}")
 
         # Store message in context
@@ -72,6 +92,16 @@ def handle_message(data):
             'role': 'user',
             'content': message
         })
+
+        # Save user message to chat history
+        with open(CHAT_HISTORY_PATH, 'a', newline='') as f:
+            writer = csv.writer(f)
+            writer.writerow([
+                session_id,
+                'user',
+                message,
+                format(datetime.now(), '%Y-%m-%d %H:%M:%S')
+            ])
 
         # Generate response using Groq
         chat_completion = groq_client.chat.completions.create(
@@ -97,10 +127,11 @@ def handle_message(data):
             - Home Insurance: Property and contents protection
             - Travel Insurance: Coverage for trips and travel-related issues
             - Business Insurance: Commercial coverage for enterprises
+            Don't generate any data about any other insurance types. Just politely mention that you only offer the types listed above.
             
             Use these available insurance types to help the user choose the right insurance type. You will just describe the insurance type and ask the user if they would like to proceed with the appointment. Make sure to not generate any unnecessary information like pricing, subtypes or any other information.
             
-            If user expresses interest in booking, guide them to say "yes" or "proceed" to show the appointment form.'''
+            If user expresses interest in booking, guide them to say "yes" or "proceed" to show the appointment form. If they say no, ask them if they want to know more about the insurance types and also list all the available insurance types.'''
                 },
                 {
                     "role": "user", 
@@ -113,10 +144,13 @@ def handle_message(data):
         )
 
         response = chat_completion.choices[0].message.content
+        response_tokens = count_tokens(response)
+        session['context']['total_tokens'] += response_tokens
+
         show_form = any(word in message.lower() for word in ['yes', 'proceed', 'book', 'schedule'])
 
         if show_form:
-            response = "Great! Please provide your details below to schedule the appointment."
+            response = "Great! I'll help you schedule an appointment. Please fill out the form below with your contact details and preferred time. I'll make sure to connect you with one of our insurance specialists."
             logger.info(f"Showing appointment form to session {session_id}")
 
         # Store bot response in context
@@ -124,6 +158,16 @@ def handle_message(data):
             'role': 'bot',
             'content': response
         })
+
+        # Save bot response to chat history
+        with open(CHAT_HISTORY_PATH, 'a', newline='') as f:
+            writer = csv.writer(f)
+            writer.writerow([
+                session_id,
+                'bot',
+                response,
+                format(datetime.now(), '%Y-%m-%d %H:%M:%S')
+            ])
 
         emit('response', {
             'response': response,
@@ -231,6 +275,16 @@ def handle_appointment(data):
             'role': 'bot',
             'content': response
         })
+
+        # Save farewell message to chat history
+        with open(CHAT_HISTORY_PATH, 'a', newline='') as f:
+            writer = csv.writer(f)
+            writer.writerow([
+                session_id,
+                'bot',
+                response,
+                format(datetime.now(), '%Y-%m-%d %H:%M:%S')
+            ])
         
         emit('response', {
             'response': response,

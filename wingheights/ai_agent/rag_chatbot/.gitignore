@@ -5,3 +5,4 @@ chat_server.log
 chatbot.log
 user_data.csv
 appointments.csv
+chat_history.csv
