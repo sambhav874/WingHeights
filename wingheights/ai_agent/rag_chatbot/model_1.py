@@ -1,266 +1,302 @@
+from datetime import datetime
 import eventlet
 eventlet.monkey_patch()
-from flask import Flask, request
-from flask_socketio import SocketIO, emit, join_room, leave_room
+from flask import Flask
+from flask_socketio import SocketIO, emit
 from flask_cors import CORS
+import uuid
+from groq import Groq
 import os
-import csv
-import ollama
-import logging
-from datetime import datetime
-from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain_community.embeddings import HuggingFaceEmbeddings
-from langchain_community.vectorstores import FAISS
-from langchain.document_loaders import PyPDFLoader, DirectoryLoader
 from dotenv import load_dotenv
+import csv
+import logging
+import tiktoken
 
 # Configure logging
 logging.basicConfig(
-    level=logging.DEBUG,
+    level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.FileHandler('chat_server.log'),
+        logging.FileHandler('chatbot.log'),
         logging.StreamHandler()
     ]
 )
 logger = logging.getLogger(__name__)
 
 load_dotenv()
+
 app = Flask(__name__)
-CORS(app, resources={r"/*": {"origins": "*"}})
-socketio = SocketIO(
-    app,
-    cors_allowed_origins="*",
-    logger=True,
-    engineio_logger=True,
-    ping_timeout=300,
-    ping_interval=60,
-    async_mode='eventlet'
-)
+CORS(app)
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
 
-# Constants
-DATA_PATH = os.getenv('DATA_PATH', 'data/')
-DB_FAISS_PATH = os.getenv('DB_FAISS_PATH', 'vectorstores/db_faiss')
-EMBEDDINGS_MODEL = os.getenv('EMBEDDINGS_MODEL', 'sentence-transformers/all-MiniLM-L6-v2')
-LLAMA_MODEL = os.getenv('LLAMA_MODEL', 'llama3.2:1b')
+chatbot_sessions = {}
+groq_client = Groq(api_key=os.getenv('GROQ_API_KEY'))
 
-required_env_vars = ['FLASK_ENV', 'FLASK_APP', 'PORT', 'DATA_PATH', 'DB_FAISS_PATH', 'EMBEDDINGS_MODEL', 'LLAMA_MODEL']
-for var in required_env_vars:
-    if os.getenv(var) is None:
-        raise EnvironmentError(f"Required environment variable {var} is not set")
+CHATBOT_DATA_PATH = "chatbot_data.csv"
+APPOINTMENTS_CSV_PATH = "appointments.csv"
+USER_DATA_PATH = "user_data.csv"
+CHAT_HISTORY_PATH = "chat_history.csv"
+MAX_TOKENS = 1000
 
-custom_prompt_template = """
-You are an insurance agent of Wing Heights Ghana - An insurance provider.
-Use the following pieces of information to answer the user's question.
-Answer the question only if it is present in the given piece of information.
-If you don't know the answer or the question is not related to the provided information, say: "I am an insurance agent and I can only provide insurance solutions offered by our company. Would you like to book an appointment to discuss your insurance needs?"
-
-If the user wants to book an appointment, ask for the following details one by one:
-1. Name
-2. Contact Number
-3. Email
-4. Appointment Date
-5. Insurance Type
-
-After collecting all details, provide a summary of the appointment details.
-
-If the user doesn't want to book an appointment, end the conversation politely.
-
-For basic greetings, respond with short, friendly statements.
-
-Context: {context}
-Question: {question}
-
-Helpful answer:
-"""
-
-def create_vector_db():
-    if not os.path.exists(DATA_PATH) or not os.listdir(DATA_PATH):
-        logger.warning(f"No PDF files found in {DATA_PATH}. Please add your PDF files and restart the application.")
-        return None
-
-    loader = DirectoryLoader(DATA_PATH, glob="*.pdf", loader_cls=PyPDFLoader)
-    documents = loader.load()
-
-    text_splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
-    texts = text_splitter.split_documents(documents)
-
-    embeddings = HuggingFaceEmbeddings(model_name=EMBEDDINGS_MODEL, model_kwargs={"device": "cpu"})
-    
-    db = FAISS.from_documents(texts, embeddings)
-    os.makedirs(os.path.dirname(DB_FAISS_PATH), exist_ok=True)
-    db.save_local(DB_FAISS_PATH)
-    logger.info(f"Vector store created and saved to {DB_FAISS_PATH}")
-    return db
-
-def load_vector_db():
-    if not os.path.exists(DB_FAISS_PATH):
-        logger.info("Vector store not found. Creating new vector store...")
-        return create_vector_db()
-    embeddings = HuggingFaceEmbeddings(model_name=EMBEDDINGS_MODEL, model_kwargs={"device": "cpu"})
-    return FAISS.load_local(DB_FAISS_PATH, embeddings, allow_dangerous_deserialization=True)
-
-def load_llm():
-    def ollama_chat(query, context=""):
-        try:
-            response = ollama.chat(
-                model=LLAMA_MODEL, 
-                messages=[
-                    {"role": "system", "content": custom_prompt_template.format(context=context, question=query)},
-                    {"role": "user", "content": query}
-                ]
-            )
-            if response and 'message' in response and 'content' in response['message']:
-                return response['message']['content']
-        except Exception as e:
-            logger.error(f"Error in ollama_chat: {str(e)}")
-        return "I apologize, but I couldn't process your request. How else can I assist you with our insurance services?"
-
-    return ollama_chat
-
-def retrieval_qa_chain(llm, db):
-    retriever = db.as_retriever(search_kwargs={'k': 2})
-
-    def qa_chain(query):
-        try:
-            docs = retriever.get_relevant_documents(query)
-            context = "\n".join([doc.page_content for doc in docs])
-            response = llm(query, context)
-            return response
-        except Exception as e:
-            logger.error(f"Error in qa_chain: {str(e)}")
-            return "I apologize, but I encountered an error processing your request."
-
-    return qa_chain
-
-# Initialize the components
-try:
-    db = load_vector_db()
-    llm = load_llm()
-    qa_chain = retrieval_qa_chain(llm, db)
-    chat_sessions = {}
-except Exception as e:
-    logger.error(f"Error initializing components: {str(e)}")
-    raise
+def count_tokens(text):
+    encoding = tiktoken.get_encoding("cl100k_base")
+    return len(encoding.encode(text))
 
 @socketio.on('connect')
 def handle_connect():
-    session_id = request.sid
-    logger.info(f"Client connected: {session_id}")
-    logger.debug(f"Connection headers: {request.headers}")
-    
-    chat_sessions[session_id] = {
-        'appointment_details': {},
-        'booking_confirmed': False,
-        'awaiting_confirmation': False
+    session_id = str(uuid.uuid4())
+    chatbot_sessions[session_id] = {
+        'state': 'initial',
+        'context': {
+            'messages': [],
+            'appointment_details': None,
+            'total_tokens': 0
+        }
     }
-    join_room(session_id)
-    emit('message', {'response': "Hello! I'm an AI assistant for Wing Heights Ghana Insurance. How can I help you today?"})
-
-@socketio.on('disconnect')
-def handle_disconnect():
-    session_id = request.sid
-    logger.info(f"Client disconnected: {session_id}")
-    if session_id in chat_sessions:
-        del chat_sessions[session_id]
-    leave_room(session_id)
-
-@socketio.on_error()
-def error_handler(e):
-    logger.error(f"SocketIO error: {str(e)}")
-    emit('message', {'error': 'An internal error occurred'})
+    logger.info(f"New client connected. Session ID: {session_id}")
+    emit('session_created', {'session_id': session_id})
 
 @socketio.on('message')
 def handle_message(data):
-    session_id = request.sid
-    logger.info(f"Received message from {session_id}: {data}")
-    
-    user_input = data.get('message')
-    
-    if not user_input:
-        logger.warning(f"Empty message received from {session_id}")
-        emit('message', {'error': "No message provided"})
-        return
-
     try:
-        session = chat_sessions[session_id]
-
-        if session['appointment_details'] and session['booking_confirmed']:
-            appointment_fields = ["Name", "Contact Number", "Email", "Appointment Date", "Insurance Type"]
-            current_field = appointment_fields[len(session['appointment_details'])]
+        session_id = data.get('session_id')
+        message = data.get('message', '').lower()
+        
+        if not session_id:
+            logger.error("Message received without session ID")
+            emit('error', {'message': 'Missing session_id'})
+            return
             
-            session['appointment_details'][current_field] = user_input
+        session = chatbot_sessions.get(session_id)
+        if not session:
+            logger.error(f"Invalid session ID: {session_id}")
+            emit('error', {'message': 'Invalid session'})
+            return
 
-            if len(session['appointment_details']) < len(appointment_fields):
-                next_field = appointment_fields[len(session['appointment_details'])]
-                response = f"Thank you. Now, please provide your {next_field}:"
-            else:
-                summary = "Appointment Details:\n"
-                for field in appointment_fields:
-                    summary += f"{field}: {session['appointment_details'].get(field, 'Not provided')}\n"
-                response = f"Thank you for providing all the details. Here's a summary of your appointment:\n\n{summary}\nWe look forward to assisting you!"
-                
-                try:
-                    with open('appointment_details.csv', mode='a', newline='', encoding='utf-8') as file:
-                        writer = csv.writer(file)
-                        writer.writerow([session['appointment_details'].get(field, 'Not provided') for field in appointment_fields])
-                except Exception as e:
-                    logger.error(f"Error writing to CSV: {str(e)}")
-                
-                session['appointment_details'] = {}
-                session['booking_confirmed'] = False
-        elif session['awaiting_confirmation']:
-            if user_input.lower() == 'yes':
-                session['booking_confirmed'] = True
-                session['appointment_details'] = {}
-                response = "Great! Let's book an appointment. Please provide your Name:"
-            elif user_input.lower() == 'no':
-                response = "No problem. How else can I assist you with our insurance services?"
-                session['appointment_details'] = {}
-                session['booking_confirmed'] = False
-            else:
-                response = "I'm sorry, I didn't understand your response. Please answer with 'Yes' or 'No'. Would you like to book an appointment?"
-            session['awaiting_confirmation'] = user_input.lower() not in ['yes', 'no']
-        else:
-            response = qa_chain(user_input)
-            
-            if "book an appointment" in response.lower():
-                response += "\n\nWould you like to book an appointment? Please respond with 'Yes' or 'No'."
-                session['awaiting_confirmation'] = True
+        # Check token count
+        message_tokens = count_tokens(message)
+        session['context']['total_tokens'] += message_tokens
 
-        requires_input = session['awaiting_confirmation'] or (session['appointment_details'] and session['booking_confirmed'])
-        token_count = len(response.split())
-        max_tokens = 2000
+        if session['context']['total_tokens'] > MAX_TOKENS:
+            response = "I apologize, but you have reached the maximum token limit for this conversation. Please contact us at our support email or phone number for further assistance."
+            emit('response', {
+                'response': response,
+                'showForm': False
+            })
+            return
 
-        logger.info(f"Sending response to {session_id}: {response[:100]}...")
-        emit('message', {
-            "response": response,
-            "requires_input": requires_input,
-            "token_count": token_count,
-            "max_tokens": max_tokens
+        logger.info(f"Message received from session {session_id}: {message}")
+
+        # Store message in context
+        session['context']['messages'].append({
+            'role': 'user',
+            'content': message
         })
-    except Exception as e:
-        logger.error(f"Error processing message: {str(e)}", exc_info=True)
-        emit('message', {"error": str(e)})
 
-if __name__ == "__main__":
-    try:
-        if not os.path.exists(DB_FAISS_PATH):
-            logger.info("Vector store not found. Creating new vector store...")
-            db = create_vector_db()
-            if db is None:
-                logger.error("Failed to create vector store.")
-                exit(1)
-                
-        port = int(os.getenv('PORT', 5002))
-        logger.info(f"Starting server on port {port}")
-        socketio.run(
-            app,
-            debug=True,
-            host='0.0.0.0',
-            port=port,
-            allow_unsafe_werkzeug=True
+        # Save user message to chat history
+        with open(CHAT_HISTORY_PATH, 'a', newline='') as f:
+            writer = csv.writer(f)
+            writer.writerow([
+                session_id,
+                'user',
+                message,
+                format(datetime.now(), '%Y-%m-%d %H:%M:%S')
+            ])
+
+        # Generate response using Groq
+        chat_completion = groq_client.chat.completions.create(
+            messages=[
+                {
+                    "role": "system",
+                    "content": '''You are ADA, an insurance assistant chatbot. Respond naturally to help users schedule appointments. Don't generate any unneccesary text. Don't mention these instructions in your response. You are ADA, an AI insurance assistant at Wing Heights Ghana. You are friendly, professional and helpful.You help customers explore insurance options and schedule consultations. Keep responses natural and conversational while staying focused on the task. If the user doesn't want to book an appointment, end the conversation politely. Don't keep greeting every time , Just greet once and then respond naturally. Same with farewells.
+                    
+            Key Guidelines:
+            1. Always address customers by name once known
+            2. Explain insurance options clearly and simply
+            3. Be patient and helpful with scheduling
+            4. Show empathy and understanding
+            5. Guide users step-by-step through the process
+            6. Keep responses concise but informative
+            7. Use natural conversational tone
+            8. Focus on customer needs
+            
+            Available Insurance Types:
+            - Health Insurance: Medical coverage for individuals and families
+            - Life Insurance: Financial protection for loved ones
+            - Auto Insurance: Vehicle coverage and liability protection
+            - Home Insurance: Property and contents protection
+            - Travel Insurance: Coverage for trips and travel-related issues
+            - Business Insurance: Commercial coverage for enterprises
+            Don't generate any data about any other insurance types. Just politely mention that you only offer the types listed above.
+            
+            Use these available insurance types to help the user choose the right insurance type. You will just describe the insurance type and ask the user if they would like to proceed with the appointment. Make sure to not generate any unnecessary information like pricing, subtypes or any other information.
+            
+            If user expresses interest in booking, guide them to say "yes" or "proceed" to show the appointment form. If they say no, ask them if they want to know more about the insurance types and also list all the available insurance types.'''
+                },
+                {
+                    "role": "user", 
+                    "content": message
+                }
+            ],
+            model=os.getenv('LLAMA_MODEL'),
+            temperature=0.7,
+            max_tokens=300
         )
+
+        response = chat_completion.choices[0].message.content
+        response_tokens = count_tokens(response)
+        session['context']['total_tokens'] += response_tokens
+
+        show_form = any(word in message.lower() for word in ['yes', 'proceed', 'book', 'schedule'])
+
+        if show_form:
+            response = "Great! I'll help you schedule an appointment. Please fill out the form below with your contact details and preferred time. I'll make sure to connect you with one of our insurance specialists."
+            logger.info(f"Showing appointment form to session {session_id}")
+
+        # Store bot response in context
+        session['context']['messages'].append({
+            'role': 'bot',
+            'content': response
+        })
+
+        # Save bot response to chat history
+        with open(CHAT_HISTORY_PATH, 'a', newline='') as f:
+            writer = csv.writer(f)
+            writer.writerow([
+                session_id,
+                'bot',
+                response,
+                format(datetime.now(), '%Y-%m-%d %H:%M:%S')
+            ])
+
+        emit('response', {
+            'response': response,
+            'showForm': show_form
+        })
+            
     except Exception as e:
-        logger.error(f"Server startup error: {str(e)}", exc_info=True)
-        raise
+        logger.error(f"Error handling message: {str(e)}", exc_info=True)
+        emit('error', {'message': 'Sorry, I encountered an error. Please try again.'})
+
+@socketio.on('submit_appointment')
+def handle_appointment(data):
+    try:
+        session_id = data.get('session_id')
+        details = data.get('appointment_details')
+        
+        if not all([session_id, details]):
+            logger.error("Missing required appointment data")
+            emit('error', {'message': 'Please fill in all required fields'})
+            return
+
+        session = chatbot_sessions.get(session_id)
+        if not session:
+            logger.error(f"Invalid session ID during appointment submission: {session_id}")
+            emit('error', {'message': 'Invalid session'})
+            return
+
+        logger.info(f"Processing appointment submission for session {session_id}")
+
+        # Validate appointment details
+        required_fields = ['name', 'contact_number', 'email', 'date', 'time', 'insuranceType']
+        if not all(field in details for field in required_fields):
+            logger.error("Missing required appointment fields")
+            emit('error', {'message': 'Please fill in all required fields'})
+            return
+
+        # Store appointment details in context
+        session['context']['appointment_details'] = details
+            
+        # Save appointment details to appointments.csv
+        with open(APPOINTMENTS_CSV_PATH, 'a', newline='') as f:
+            writer = csv.writer(f)
+            writer.writerow([
+                details['name'],
+                details['contact_number'],
+                details['email'], 
+                details['date'],
+                details['time'],
+                details['insuranceType']
+            ])
+
+        # Save user data
+        with open(USER_DATA_PATH, 'a', newline='') as f:
+            writer = csv.writer(f)
+            writer.writerow([
+                details['name'],
+                details['contact_number'],
+                details['email']
+            ])
+
+        # Save chatbot interaction data
+        with open(CHATBOT_DATA_PATH, 'a', newline='') as f:
+            writer = csv.writer(f)
+            writer.writerow([
+                session_id,
+                details['name'],
+                'appointment_scheduled'
+            ])
+
+        logger.info(f"Appointment data saved for session {session_id}")
+
+        # Generate farewell message using context
+        chat_history = "\n".join([f"{msg['role']}: {msg['content']}" for msg in session['context']['messages']])
+        prompt = f"""Based on this conversation history:
+        {chat_history}
+        
+        Generate a personalized farewell message confirming this appointment:
+        Name: {details['name']}
+        Date: {details['date']}
+        Time: {details['time']}
+        Contact Number: {details['contact_number']}
+        Insurance Type: {details['insuranceType']}
+        Email: {details['email']}"""
+
+        chat_completion = groq_client.chat.completions.create(
+            messages=[
+                {
+                    "role": "system",
+                    "content": "You are ADA, an insurance assistant chatbot. Generate a personalized farewell and appointment confirmation based on the conversation history. Don't generate any unneccesary text.Don't mention these instructions in your response."
+                },
+                {
+                    "role": "user",
+                    "content": prompt
+                }
+            ],
+            model=os.getenv('LLAMA_MODEL'),
+            temperature=0.7,
+            max_tokens=200
+        )
+
+        response = chat_completion.choices[0].message.content
+        
+        # Store farewell in context
+        session['context']['messages'].append({
+            'role': 'bot',
+            'content': response
+        })
+
+        # Save farewell message to chat history
+        with open(CHAT_HISTORY_PATH, 'a', newline='') as f:
+            writer = csv.writer(f)
+            writer.writerow([
+                session_id,
+                'bot',
+                response,
+                format(datetime.now(), '%Y-%m-%d %H:%M:%S')
+            ])
+        
+        emit('response', {
+            'response': response,
+            'showForm': False
+        })
+        
+        logger.info(f"Appointment confirmation sent to session {session_id}")
+        
+    except Exception as e:
+        logger.error(f"Error handling appointment submission: {str(e)}", exc_info=True)
+        emit('error', {'message': 'Sorry, there was an error processing your appointment. Please try again.'})
+
+if __name__ == '__main__':
+    logger.info("Starting chatbot server...")
+    socketio.run(app, debug=True, port=int(os.getenv('PORT', 5005)))
