@@ -16,3 +16,4 @@ logging
 eventlet
 gunicorn
 groq
+tiktoken
