@@ -221,7 +221,7 @@ export default function ChatWidget() {
                 <CardTitle className="text-sm md:text-base font-semibold bg-gradient-to-r from-primary to-primary/80 bg-clip-text text-transparent">ADA Insurance Assistant</CardTitle>
                 <CardDescription className="text-[10px] md:text-xs flex items-center gap-1.5">
                   <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span>
-                  Online • Ready to help
+                  Online
                 </CardDescription>
               </div>
             </div>
@@ -243,7 +243,7 @@ export default function ChatWidget() {
                 <div
                   key={index}
                   className={cn(
-                    "flex items-end gap-3 group transition-opacity duration-200",
+                    "flex items-end gap-3 p-1 group transition-opacity duration-200",
                     message.role === 'user' && "justify-end"
                   )}
                 >

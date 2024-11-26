@@ -7,7 +7,7 @@ import { MainNavigation } from "@/components/MainNavigation";
 import { Footer } from "@/components/Footer";
 import InsuranceQuoteWidget from "@/components/InsuranceQuoteWidget";
 import { TestContext } from "node:test";
-import Test from "@/components/Test";
+import Test from "@/components/ChatBot";
 
 const geistSans = localFont({
   src: "./fonts/GeistVF.woff",
