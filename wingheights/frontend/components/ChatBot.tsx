@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Separator } from "@/components/ui/separator"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Loader2, Send, Bot, User, MessageSquare, X } from "lucide-react"
+import { Loader2, Send, Bot, User, MessageSquare, X, History } from 'lucide-react'
 import { cn } from "@/lib/utils"
 import { Form } from "./AppointmentForm"
 import { format } from "date-fns"
@@ -37,6 +37,7 @@ interface SocketResponse {
 
 export default function ChatWidget() {
   const [messages, setMessages] = useState<Message[]>([])
+  const [prevConversations, setPrevConversations] = useState<Message[][]>([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [showForm, setShowForm] = useState(false)
@@ -45,8 +46,11 @@ export default function ChatWidget() {
   const [connected, setConnected] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [isOpen, setIsOpen] = useState(false)
+  const [sessionEnded, setSessionEnded] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+  const [appointmentBooked, setAppointmentBooked] = useState(false)
+  const [showPreviousConvos, setShowPreviousConvos] = useState(false)
 
   // If no socket URL is provided, return disabled state with message
   if (!process.env.NEXT_PUBLIC_SOCKET_URL) {
@@ -112,6 +116,14 @@ export default function ChatWidget() {
         setShowForm(true)
       }
       setLoading(false)
+      
+      // Check if the session has ended
+      if (data.response.toLowerCase().includes("thank you for using our service") || 
+          data.response.toLowerCase().includes("goodbye") ||
+          data.response.toLowerCase().includes("have a great day")) {
+        setSessionEnded(true)
+        setAppointmentBooked(true)
+      }
     })
 
     newSocket.on('error', (data: { message: string }) => {
@@ -127,16 +139,34 @@ export default function ChatWidget() {
     }
   }, [isOpen])
 
+  const resetChatState = () => {
+    // Save the current conversation to previous conversations before resetting
+    if (messages.length > 0) {
+      setPrevConversations(prev => [...prev, messages])
+    }
+
+    setMessages([])
+    setSessionId(null)
+    setShowForm(false)
+    setSessionEnded(false)
+    setAppointmentBooked(false)
+    setInput('')
+    setLoading(false)
+    setError(null)
+    setShowPreviousConvos(false)
+  }
+
   const addMessage = (role: 'user' | 'bot', content: string) => {
-    setMessages(prev => [...prev, {
+    const newMessage = {
       role,
       content,
       timestamp: new Date().toISOString()
-    }])
+    }
+    setMessages(prev => [...prev, newMessage])
   }
 
   const handleSendMessage = () => {
-    if (!input.trim() || !socket || !sessionId || loading) return
+    if (!input.trim() || !socket || !sessionId || loading || sessionEnded || appointmentBooked) return
 
     const message = input.trim()
     setInput('')
@@ -163,6 +193,7 @@ export default function ChatWidget() {
     })
 
     setShowForm(false)
+    setAppointmentBooked(true)
   }
 
   const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -173,7 +204,21 @@ export default function ChatWidget() {
   }
 
   const toggleChat = () => {
+    if (isOpen) {
+      resetChatState()
+    }
     setIsOpen(prev => !prev)
+  }
+
+  const startNewChat = () => {
+    resetChatState()
+    if (socket) {
+      socket.emit('new_session')
+    }
+  }
+
+  const togglePreviousConversations = () => {
+    setShowPreviousConvos(prev => !prev)
   }
 
   if (!isOpen) {
@@ -225,116 +270,193 @@ export default function ChatWidget() {
                 </CardDescription>
               </div>
             </div>
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              onClick={toggleChat} 
-              className="h-8 w-8 hover:bg-destructive/10 hover:text-destructive transition-colors"
-            >
-              <X className="h-4 w-4" />
-            </Button>
+            <div className="flex items-center gap-2">
+              {prevConversations.length > 0 && (
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  onClick={togglePreviousConversations} 
+                  className={cn(
+                    "h-8 w-8 transition-colors",
+                    showPreviousConvos 
+                      ? "bg-primary/10 text-primary" 
+                      : "hover:bg-muted/20"
+                  )}
+                >
+                  <History className="h-4 w-4" />
+                </Button>
+              )}
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                onClick={toggleChat} 
+                className="h-8 w-8 hover:bg-destructive/10 hover:text-destructive transition-colors"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
         </CardHeader>
 
         <CardContent className="flex-1 flex flex-col p-0 overflow-hidden">
           <ScrollArea className="flex-1 px-4 py-3">
             <div className="space-y-4">
-              {messages.map((message, index) => (
-                <div
-                  key={index}
-                  className={cn(
-                    "flex items-end gap-3 p-1 group transition-opacity duration-200",
-                    message.role === 'user' && "justify-end"
-                  )}
-                >
-                  {message.role === 'bot' && (
-                    <Avatar className="h-8 w-8 shrink-0 ring-2 ring-primary/20">
-                      <AvatarImage src="/bot-avatar.png" alt="ADA" className="object-cover" />
-                      <AvatarFallback className="bg-primary/10">
-                        <Bot className="h-5 w-5 text-primary" />
-                      </AvatarFallback>
-                    </Avatar>
-                  )}
-                  <div
-                    className={cn(
-                      "px-4 py-2.5 rounded-2xl max-w-[85%] break-words shadow-md transition-all duration-200",
-                      message.role === 'user' 
-                        ? "bg-gradient-to-r from-primary to-primary/90 text-white rounded-br-none" 
-                        : "bg-muted/50 backdrop-blur-sm rounded-bl-none hover:bg-muted/70"
-                    )}
-                  >
-                    <div className={cn(
-                      "text-sm md:text-base prose prose-sm max-w-none",
-                      message.role === 'user' ? "text-white" : "dark:prose-invert"
-                    )}>
-                      <ReactMarkdown>{message.content}</ReactMarkdown>
-                    </div>
-                    <span className={cn(
-                      "text-[9px] md:text-[11px] opacity-0 group-hover:opacity-70 transition-opacity duration-300 mt-1 inline-block",
-                      message.role === 'user' ? "text-white/70" : "text-foreground/70"
-                    )}>
-                      {format(new Date(message.timestamp), 'HH:mm')}
-                    </span>
+              {/* Render previous conversations if toggled */}
+              {showPreviousConvos && prevConversations.map((conversation, conversationIndex) => (
+                <div key={`prev-convo-${conversationIndex}`} className="mb-4">
+                  <div className="text-xs text-muted-foreground text-center mb-2 flex items-center justify-center">
+                    <Separator className="flex-grow mr-2" />
+                    Previous Conversation {conversationIndex + 1}
+                    <Separator className="flex-grow ml-2" />
                   </div>
-                  {message.role === 'user' && (
-                    <Avatar className="h-8 w-8 shrink-0 ring-2 ring-primary/20">
-                      <AvatarFallback className="bg-gradient-to-r from-primary to-primary/80">
-                        <User className="h-5 w-5 text-white" />
-                      </AvatarFallback>
-                    </Avatar>
-                  )}
-                </div>
-              ))}
-              {loading && (
-                <div className="flex items-center gap-2 text-muted-foreground pl-11">
-                  <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
-                  <span className="text-xs font-medium">ADA is typing...</span>
-                </div>
-              )}
-              {error && (
-                <div className="mx-4 p-3 rounded-lg bg-destructive/10 text-destructive text-xs font-medium border border-destructive/20">
-                  {error}
-                </div>
-              )}
-              <div ref={messagesEndRef} />
-            </div>
-          </ScrollArea>
+                  {conversation.map((message, messageIndex) => (
+                    <div
+                      key={`prev-convo-msg-${conversationIndex}-${messageIndex}`}
+                      className={cn(
+                        "flex items-end gap-3 p-1 group transition-opacity duration-200 opacity-60 hover:opacity-100",
+                        message.role === 'user' && "justify-end"
+                      )}
+                    >
+                      {message.role === 'bot' && (
+                        <Avatar className="h-8 w-8 shrink-0 ring-2 ring-primary/20">
+                          <AvatarImage src="/bot-avatar.png" alt="ADA" className="object-cover" />
+                          <AvatarFallback className="bg-primary/10">
+                            <Bot className="h-5 w-5 text-primary" />
+                          </AvatarFallback>
+                        </Avatar>
+                      )}
+                      <div
+                        className={cn(
+                          "px-4 py-2.5 rounded-2xl max-w-[85%] break-words shadow-md transition-all duration-200",
+                          message.role === 'user' 
+                            ? "bg-gradient-to-r from-primary to-primary/90 text-white rounded-br-none" 
+                            : "bg-muted/50 backdrop-blur-sm rounded-bl-none hover:bg-muted/70"
+                        )}
+                      >
+                        <div className={cn(
+                          "text-sm md:text-base prose prose-sm max-w-none",
+                          message.role === 'user' ? "text-white" : "dark:prose-invert"
+                        )}>
+                          <ReactMarkdown>{message.content}</ReactMarkdown>
+                        </div>
+                        <span className={cn(
+                          "text-[9px] md:text-[11px] opacity-0 group-hover:opacity-70 transition-opacity duration-300 mt-1 inline-block",
+                          message.role === 'user' ? "text-white/70" : "text-foreground/70"
+                        )}>
+                          {format(new Date(message.timestamp), 'HH:mm')}
+                        </span>
+                      </div>
+                      {message.role === 'user' && (
+                        <Avatar className="h-8 w-8 shrink-0 ring-2 ring-primary/20">
+                          <AvatarFallback className="bg-gradient-to-r from-primary to-primary/80">
+                            <User className="h-5 w-5 text-white" />
+                          </AvatarFallback>
+                        </Avatar>
+                      )}
+                    </div>
+                  ))}
+                </div>))}
 
-          <Separator className="shrink-0" />
-
-          <div className="p-4 bg-gradient-to-b from-background/50 to-background">
-            {showForm ? (
-              <ScrollArea className="h-[250px] pr-4">
-                <Form onSubmit={handleFormSubmit} />
-              </ScrollArea>
-            ) : (
-              <div className="flex gap-2">
-                <Input
-                  ref={inputRef}
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  onKeyPress={handleKeyPress}
-                  placeholder="Type your message..."
-                  disabled={loading}
-                  className="flex-grow text-sm shadow-sm border-opacity-50 focus:border-primary/50 transition-all duration-200"
-                />
-                <Button 
-                  onClick={handleSendMessage}
-                  disabled={loading || !input.trim()}
-                  size="icon"
-                  className="shrink-0 h-10 w-10 rounded-full shadow-md hover:shadow-lg transition-all duration-300 bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70"
-                >
-                  {loading ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Send className="h-4 w-4" />
-                  )}
-                </Button>
-              </div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+{/* Current conversation messages */}
+{messages.map((message, index) => (
+  <div
+    key={index}
+    className={cn(
+      "flex items-end gap-3 p-1 group transition-opacity duration-200",
+      message.role === 'user' && "justify-end"
+    )}
+  >
+    {message.role === 'bot' && (
+      <Avatar className="h-8 w-8 shrink-0 ring-2 ring-primary/20">
+        <AvatarImage src="/bot-avatar.png" alt="ADA" className="object-cover" />
+        <AvatarFallback className="bg-primary/10">
+          <Bot className="h-5 w-5 text-primary" />
+        </AvatarFallback>
+      </Avatar>
+    )}
+    <div
+      className={cn(
+        "px-4 py-2.5 rounded-2xl max-w-[85%] break-words shadow-md transition-all duration-200",
+        message.role === 'user' 
+          ? "bg-gradient-to-r from-primary to-primary/90 text-white rounded-br-none" 
+          : "bg-muted/50 backdrop-blur-sm rounded-bl-none hover:bg-muted/70"
+      )}
+    >
+      <div className={cn(
+        "text-sm md:text-base prose prose-sm max-w-none",
+        message.role === 'user' ? "text-white" : "dark:prose-invert"
+      )}>
+        <ReactMarkdown>{message.content}</ReactMarkdown>
+      </div>
+      <span className={cn(
+        "text-[9px] md:text-[11px] opacity-0 group-hover:opacity-70 transition-opacity duration-300 mt-1 inline-block",
+        message.role === 'user' ? "text-white/70" : "text-foreground/70"
+      )}>
+        {format(new Date(message.timestamp), 'HH:mm')}
+      </span>
     </div>
-  )
+    {message.role === 'user' && (
+      <Avatar className="h-8 w-8 shrink-0 ring-2 ring-primary/20">
+        <AvatarFallback className="bg-gradient-to-r from-primary to-primary/80">
+          <User className="h-5 w-5 text-white" />
+        </AvatarFallback>
+      </Avatar>
+    )}
+  </div>
+))}
+
+{loading && (
+  <div className="flex items-center gap-2 text-muted-foreground pl-11">
+    <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
+    <span className="text-xs font-medium">ADA is typing...</span>
+  </div>
+)}
+{error && (
+  <div className="mx-4 p-3 rounded-lg bg-destructive/10 text-destructive text-xs font-medium border border-destructive/20">
+    {error}
+  </div>
+)}
+<div ref={messagesEndRef} />
+</div>
+</ScrollArea>
+
+<Separator className="shrink-0" />
+
+<div className="p-4 bg-gradient-to-b from-background/50 to-background">
+{showForm ? (
+<ScrollArea className="h-[250px] pr-4">
+  <Form onSubmit={handleFormSubmit} />
+</ScrollArea>
+) : (
+<div className="flex gap-2">
+  <Input
+    ref={inputRef}
+    value={input}
+    onChange={(e) => setInput(e.target.value)}
+    onKeyPress={handleKeyPress}
+    placeholder={appointmentBooked ? "Chat session has ended" : "Type your message..."}
+    disabled={loading || appointmentBooked}
+    className="flex-grow text-sm shadow-sm border-opacity-50 focus:border-primary/50 transition-all duration-200"
+  />
+  <Button 
+    onClick={appointmentBooked ? startNewChat : handleSendMessage}
+    disabled={loading || appointmentBooked || (!appointmentBooked && !input.trim())}
+    size="icon"
+    className="shrink-0 h-10 w-10 rounded-full shadow-md hover:shadow-lg transition-all duration-300 bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70"
+  >
+    {loading ? (
+      <Loader2 className="h-4 w-4 animate-spin" />
+    ) : appointmentBooked ? (
+      <MessageSquare className="h-4 w-4" />
+    ) : (
+      <Send className="h-4 w-4" />
+    )}
+  </Button>
+</div>
+)}
+</div>
+</CardContent>
+</Card>
+</div>
+)
 }
